@@ -31,10 +31,16 @@ nav{background:linear-gradient(135deg,#060D1A,#0D1E38);border-bottom:1px solid v
 .live-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite}
 .nav-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .user-pill{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:20px;padding:5px 12px;font-size:12px}
-.role-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;text-transform:uppercase}
-.role-supervisor{background:#7c3aed;color:#ddd6fe}
+.role-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.role-admin{background:#5b21b6;color:#ddd6fe}
+.role-hse{background:#064e3b;color:#6ee7b7}
+.role-superintendent{background:#1e1b4b;color:#a5b4fc}
+.role-auditor{background:#451a03;color:#fcd34d}
+.role-ops_supervisor{background:#14532d;color:#bbf7d0}
 .role-operations{background:#166534;color:#86efac}
+.role-mech_supervisor{background:#1e3a8a;color:#93c5fd}
 .role-mechanical{background:#1e40af;color:#bfdbfe}
+.role-elec_supervisor{background:#7c2d12;color:#fdba74}
 .role-electrical{background:#7f1d1d;color:#fca5a5}
 .tabs{background:var(--s1);border-bottom:1px solid var(--b);padding:0 20px;display:flex;overflow-x:auto;gap:2px}
 .tab{padding:10px 16px;border:none;background:none;color:var(--muted);font-size:13px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
@@ -210,10 +216,31 @@ function lockBadgeClass(type) {
   return 'badge-gray';
 }
 function roleLockType(role) {
-  if (role === 'operations') return 'operations';
-  if (role === 'mechanical') return 'mechanical';
-  if (role === 'electrical') return 'electrical';
+  if (role === 'operations'  || role === 'ops_supervisor')  return 'operations';
+  if (role === 'mechanical'  || role === 'mech_supervisor') return 'mechanical';
+  if (role === 'electrical'  || role === 'elec_supervisor') return 'electrical';
   return null;
+}
+const ROLE_OPTIONS = [
+  { value: 'admin',          label: 'Admin (Program Manager)' },
+  { value: 'hse',            label: 'HSE Supervisor' },
+  { value: 'superintendent', label: 'Plant Superintendent' },
+  { value: 'auditor',        label: 'Internal Auditor' },
+  { value: 'ops_supervisor', label: 'Operations Shift Supervisor' },
+  { value: 'operations',     label: 'Operations Technician' },
+  { value: 'mech_supervisor',label: 'Mechanical Supervisor' },
+  { value: 'mechanical',     label: 'Mechanical Technician' },
+  { value: 'elec_supervisor',label: 'Electrical Supervisor' },
+  { value: 'electrical',     label: 'Electrical Technician' },
+];
+function roleDisplay(role) {
+  return (ROLE_OPTIONS.find(r => r.value === role) || {}).label || role;
+}
+function isViewOnly(role) {
+  return ['hse','superintendent','auditor'].includes(role);
+}
+function isAdminLevel(role) {
+  return role === 'admin';
 }
 
 // ── PRINT DANGER TAG ─────────────────────────────────────────────────────────
@@ -1184,7 +1211,7 @@ function SuperPersonnel() {
   const [selected, setSelected] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [q, setQ] = useState('');
-  const [form, setForm] = useState({ full_name: '', id_no: '', employee_id: '', role: 'operations', company: '', shift: '' });
+  const [form, setForm] = useState({ full_name: '', id_no: '', employee_id: '', role: 'operations', company: '', shift: '', group: '' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -1231,7 +1258,7 @@ function SuperPersonnel() {
         <div className="card">
           <div className="section-header">
             <div className="card-title" style={{ margin: 0 }}>Personnel ({personnel.length})</div>
-            <button className="btn btn-accent" onClick={() => { setShowAdd(true); setErr(''); setForm({ full_name:'', id_no:'', employee_id:'', role:'operations', company:'', shift:'' }); }}>+ Add Employee</button>
+            <button className="btn btn-accent" onClick={() => { setShowAdd(true); setErr(''); setForm({ full_name:'', id_no:'', employee_id:'', role:'operations', company:'', shift:'', group:'' }); }}>+ Add Employee</button>
           </div>
           <div className="search-row" style={{ marginBottom: 12 }}>
             <div className="search-box" style={{ flex: 1 }}>
@@ -1248,7 +1275,7 @@ function SuperPersonnel() {
                     <div style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</div>
                     <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.id_no} · {p.company}</div>
                   </div>
-                  <span className={`role-badge role-${p.role}`}>{p.role}</span>
+                  <span className={`role-badge role-${p.role}`}>{roleDisplay(p.role)}</span>
                   {!p.active && <span className="badge badge-gray" style={{ fontSize: 10 }}>Inactive</span>}
                 </div>
               ))}
@@ -1271,10 +1298,7 @@ function SuperPersonnel() {
                 <span className="detail-label">Role</span>
                 <select value={selected.role} onChange={e => changeRole(selected, e.target.value)}
                   style={{ background: 'var(--s3)', border: '1px solid var(--b)', color: '#E2E8F0', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="operations">Operations</option>
-                  <option value="mechanical">Mechanical</option>
-                  <option value="electrical">Electrical</option>
+                  {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
                 </select>
               </div>
               <div className="detail-row"><span className="detail-label">Company</span><span>{selected.company || '—'}</span></div>
@@ -1311,10 +1335,7 @@ function SuperPersonnel() {
             <div className="form-group"><label className="form-label">Employee ID</label><input type="text" value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))} style={{ width: '100%' }} /></div>
             <div className="form-group"><label className="form-label">Role</label>
               <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={{ width: '100%' }}>
-                <option value="supervisor">Supervisor</option>
-                <option value="operations">Operations</option>
-                <option value="mechanical">Mechanical</option>
-                <option value="electrical">Electrical</option>
+                {ROLE_OPTIONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
             </div>
           </div>
@@ -1372,16 +1393,225 @@ function OperationsApp({ session, equipment, locks, onRefresh }) {
 
 // ── MECHANICAL / ELECTRICAL APP ───────────────────────────────────────────────
 function MechElecApp({ session, equipment, locks, onRefresh }) {
-  const [tab, setTab] = useState('smart');
+  const isSup = session.role === 'mech_supervisor' || session.role === 'elec_supervisor';
+  const myLockType = roleLockType(session.role);
+  const [tab, setTab] = useState(isSup ? 'all' : 'smart');
   return (
     <>
       <div className="tabs">
+        {isSup && <button className={`tab ${tab==='all'   ?'on':''}`} onClick={() => setTab('all')}>Team Locks</button>}
         <button className={`tab ${tab === 'smart'  ? 'on' : ''}`} onClick={() => setTab('smart')}>Smart List</button>
         <button className={`tab ${tab === 'search' ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
       </div>
-      {tab === 'smart'  && <SmartListTab      session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'all'    && <AllTypedLocksTab   lockType={myLockType} session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'smart'  && <SmartListTab        session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'search' && <SearchEquipmentTab  session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+    </>
+  );
+}
+
+// ── OPS SUPERVISOR: ALL OPS LOCKS TAB ────────────────────────────────────────
+function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
+  const allOps = locks.filter(l => l.lock_type === 'operations' && l.status === 'applied');
+  const [removeModal, setRemoveModal] = useState(null);
+  const [shiftOnly, setShiftOnly] = useState(false);
+  const displayed = shiftOnly ? allOps.filter(l => l.applied_id_no === session.id_no) : allOps;
+  return (
+    <div className="main">
+      <div className="card">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
+          <div className="card-title" style={{ margin:0 }}>Operations Locks — All Shifts ({allOps.length})</div>
+          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
+            <input type="checkbox" checked={shiftOnly} onChange={e => setShiftOnly(e.target.checked)} />
+            My locks only
+          </label>
+        </div>
+        <div className="hooks-board">
+          {locks.filter(l => l.lock_type === 'operations').map(l => (
+            <div key={l.id} className="hook ops" style={{ opacity: l.status === 'available' ? .4 : 1 }}>
+              <span style={{ fontSize:8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
+              <span style={{ fontSize:9 }}>{l.lock_no}</span>
+              {l.box_slot && <span style={{ fontSize:7, color:'var(--muted)' }}>{l.box_slot}</span>}
+            </div>
+          ))}
+          {locks.filter(l => l.lock_type === 'operations').length === 0 &&
+            <div className="empty">No operations locks in system.</div>}
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-title">Applied Locks ({displayed.length})</div>
+        {displayed.length === 0 && <div className="empty">No operations locks applied.</div>}
+        {displayed.map(l => {
+          const eq = equipment.find(e => e.id === l.equipment_id);
+          return (
+            <div key={l.id} style={{ background:'var(--s2)', border:'1px solid var(--b)', borderRadius:9, padding:13, marginBottom:8 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <span className="badge badge-green" style={{ marginRight:8 }}>{l.lock_no}</span>
+                  {eq && <span style={{ fontWeight:700 }}>{eq.tag} — {eq.name}</span>}
+                  <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>
+                    By: <strong>{l.applied_by}</strong> | Reason: {l.reason} | Permit: {l.permit || '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--muted)' }}>
+                    Applied: {l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}
+                    {eq && <span> | Location: {eq.plant} → {eq.mcc_room} → {eq.rack} → {eq.row_position}</span>}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit })}>
+                    🖨 Tag
+                  </button>
+                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {removeModal && (
+        <RemoveLockModal lock={removeModal.lock} equipment={removeModal.eq} session={session}
+          onClose={() => setRemoveModal(null)}
+          onRemoved={() => { setRemoveModal(null); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── MECH/ELEC SUPERVISOR: ALL TEAM LOCKS TAB ─────────────────────────────────
+function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
+  const allLocks = locks.filter(l => l.lock_type === lockType && l.status === 'applied');
+  const [removeModal, setRemoveModal] = useState(null);
+  const bClass = lockType === 'mechanical' ? 'badge-blue' : 'badge-red';
+  const hookClass = lockType === 'mechanical' ? 'mech' : 'elec';
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="card-title">All {lockType.charAt(0).toUpperCase()+lockType.slice(1)} Locks — Team View ({allLocks.length})</div>
+        <div className="hooks-board">
+          {locks.filter(l => l.lock_type === lockType).map(l => (
+            <div key={l.id} className={`hook ${hookClass}`} style={{ opacity: l.status === 'available' ? .4 : 1 }}>
+              <span style={{ fontSize:8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
+              <span style={{ fontSize:9 }}>{l.lock_no}</span>
+              {l.box_slot && <span style={{ fontSize:7, color:'var(--muted)' }}>{l.box_slot}</span>}
+            </div>
+          ))}
+          {locks.filter(l => l.lock_type === lockType).length === 0 &&
+            <div className="empty">No {lockType} locks in system.</div>}
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-title">Applied ({allLocks.length})</div>
+        {allLocks.length === 0 && <div className="empty">No {lockType} locks currently applied.</div>}
+        {allLocks.map(l => {
+          const eq = equipment.find(e => e.id === l.equipment_id);
+          return (
+            <div key={l.id} style={{ background:'var(--s2)', border:'1px solid var(--b)', borderRadius:9, padding:13, marginBottom:8 }}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:8 }}>
+                <div>
+                  <span className={`badge ${bClass}`} style={{ marginRight:8 }}>{l.lock_no}</span>
+                  {eq && <span style={{ fontWeight:700 }}>{eq.tag} — {eq.name}</span>}
+                  <div style={{ fontSize:11, color:'var(--muted)', marginTop:4 }}>
+                    By: <strong>{l.applied_by}</strong> | Reason: {l.reason} | Slot: {l.box_slot || '—'}
+                  </div>
+                  <div style={{ fontSize:11, color:'var(--muted)' }}>
+                    Applied: {l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}
+                  </div>
+                </div>
+                <div style={{ display:'flex', gap:6 }}>
+                  <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit })}>
+                    🖨 Tag
+                  </button>
+                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {removeModal && (
+        <RemoveLockModal lock={removeModal.lock} equipment={removeModal.eq} session={session}
+          onClose={() => setRemoveModal(null)}
+          onRemoved={() => { setRemoveModal(null); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── OPS SUPERVISOR APP ────────────────────────────────────────────────────────
+function OpsSupervisorApp({ session, equipment, locks, onRefresh }) {
+  const [tab, setTab] = useState('all');
+  return (
+    <>
+      <div className="tabs">
+        <button className={`tab ${tab==='all'   ?'on':''}`} onClick={() => setTab('all')}>All Ops Locks</button>
+        <button className={`tab ${tab==='my'    ?'on':''}`} onClick={() => setTab('my')}>My Locks</button>
+        <button className={`tab ${tab==='search'?'on':''}`} onClick={() => setTab('search')}>Search Equipment</button>
+      </div>
+      {tab === 'all'    && <AllOpsLocksTab    session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'my'     && <OpsMyLocksTab     session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
       {tab === 'search' && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
     </>
+  );
+}
+
+// ── READ-ONLY APP (HSE / SUPERINTENDENT / AUDITOR) ────────────────────────────
+function ReadOnlyApp({ session, equipment, locks }) {
+  const [tab, setTab] = useState('dashboard');
+  const isAuditor = session.role === 'auditor';
+  const TABS = [
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'reports',   label: '📋 Reports' },
+    ...(isAuditor ? [{ id: 'audit', label: '🔍 Audit Log' }] : []),
+  ];
+  return (
+    <>
+      <div className="tabs">
+        {TABS.map(t => <button key={t.id} className={`tab ${tab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
+      </div>
+      {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {tab === 'reports'   && <SuperReports session={session} />}
+      {tab === 'audit'     && <AuditLogReadOnly />}
+    </>
+  );
+}
+
+function AuditLogReadOnly() {
+  const [log, setLog] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    db.from('audit_log').select('*').order('action_at', { ascending: false }).limit(200)
+      .then(({ data }) => { setLog(data || []); setLoading(false); });
+  }, []);
+  if (loading) return <div className="main"><div className="loading-center"><div className="spin" /></div></div>;
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="card-title">Audit Log — Last 200 Records</div>
+        {log.length === 0 && <div className="empty">No records.</div>}
+        <div style={{ overflowX:'auto' }}>
+          <table>
+            <thead><tr><th>Action</th><th>Lock No</th><th>Type</th><th>Equipment</th><th>By</th><th>ID No</th><th>Reason</th><th>Slot</th><th>Date/Time</th></tr></thead>
+            <tbody>
+              {log.map(h => (
+                <tr key={h.id}>
+                  <td><span style={{ color: h.action==='APPLIED'?'#ef4444':'#22c55e', fontWeight:700 }}>{h.action}</span></td>
+                  <td style={{ fontFamily:'monospace', fontWeight:700 }}>{h.lock_no||'—'}</td>
+                  <td>{h.lock_type||'—'}</td>
+                  <td style={{ fontWeight:600 }}>{h.eq_tag||'—'}</td>
+                  <td>{h.by_name||'—'}</td>
+                  <td style={{ fontFamily:'monospace' }}>{h.by_id_no||'—'}</td>
+                  <td style={{ fontSize:11 }}>{h.reason||'—'}</td>
+                  <td style={{ fontFamily:'monospace' }}>{h.box_slot||'—'}</td>
+                  <td style={{ fontSize:11, whiteSpace:'nowrap' }}>{h.action_at ? new Date(h.action_at).toLocaleString() : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1547,15 +1777,18 @@ function App() {
         <div className="nav-right">
           <div className="user-pill">
             <span style={{ fontWeight: 700 }}>{session.full_name}</span>
-            <span className={`role-badge role-${session.role}`}>{session.role}</span>
+            <span className={`role-badge role-${session.role}`}>{roleDisplay(session.role)}</span>
             {session.shift && <span style={{ fontSize: 10, color: 'var(--muted)' }}>Shift: {session.shift}</span>}
           </div>
           <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Sign Out</button>
         </div>
       </nav>
-      {session.role === 'supervisor'  && <SupervisorApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {session.role === 'operations'  && <OperationsApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {(session.role === 'mechanical' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'admin'          && <SupervisorApp    session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {isViewOnly(session.role)           && <ReadOnlyApp      session={session} equipment={equipment} locks={locks} />}
+      {session.role === 'ops_supervisor'  && <OpsSupervisorApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'operations'      && <OperationsApp    session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {(session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {(session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       <Toasts />
     </>
   );
