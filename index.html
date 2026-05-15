@@ -99,9 +99,12 @@ tr:last-child td{border-bottom:none}
 .alert-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
 .alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fcd34d}
 .alert-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
-.box-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:10px}
-.box-slot{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1px solid var(--b);background:var(--s2);transition:all .2s;position:relative;min-height:50px}
-.box-slot-label{font-size:9px;color:var(--muted);position:absolute;top:3px;left:0;right:0;text-align:center}
+.role-mech_superintendent{background:#0c2a4a;color:#7dd3fc}
+.role-elec_superintendent{background:#4a0c0c;color:#fca5a5}
+.box-grid-8{display:grid;grid-template-columns:repeat(8,1fr);gap:5px;margin-top:8px}
+.box-grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
+.box-slot{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1px solid var(--b);background:var(--s2);transition:all .2s;position:relative;min-height:44px}
+.box-slot-label{font-size:8px;color:var(--muted);position:absolute;top:2px;left:0;right:0;text-align:center}
 .hooks-board{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .hook{width:48px;height:56px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;background:var(--s2)}
 .hook.ops{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:#22c55e}
@@ -216,22 +219,26 @@ function lockBadgeClass(type) {
   return 'badge-gray';
 }
 function roleLockType(role) {
-  if (role === 'operations'  || role === 'ops_supervisor')  return 'operations';
-  if (role === 'mechanical'  || role === 'mech_supervisor') return 'mechanical';
-  if (role === 'electrical'  || role === 'elec_supervisor') return 'electrical';
+  if (role === 'operations'        || role === 'ops_supervisor')       return 'operations';
+  if (role === 'mechanical'        || role === 'mech_supervisor'
+                                   || role === 'mech_superintendent')  return 'mechanical';
+  if (role === 'electrical'        || role === 'elec_supervisor'
+                                   || role === 'elec_superintendent')  return 'electrical';
   return null;
 }
 const ROLE_OPTIONS = [
-  { value: 'admin',          label: 'Admin (Program Manager)' },
-  { value: 'hse',            label: 'HSE Supervisor' },
-  { value: 'superintendent', label: 'Plant Superintendent' },
-  { value: 'auditor',        label: 'Internal Auditor' },
-  { value: 'ops_supervisor', label: 'Operations Shift Supervisor' },
-  { value: 'operations',     label: 'Operations Technician' },
-  { value: 'mech_supervisor',label: 'Mechanical Supervisor' },
-  { value: 'mechanical',     label: 'Mechanical Technician' },
-  { value: 'elec_supervisor',label: 'Electrical Supervisor' },
-  { value: 'electrical',     label: 'Electrical Technician' },
+  { value: 'admin',               label: 'Admin (Program Manager)'         },
+  { value: 'hse',                 label: 'HSE Supervisor'                   },
+  { value: 'superintendent',      label: 'Plant Superintendent'             },
+  { value: 'auditor',             label: 'Internal Auditor'                 },
+  { value: 'ops_supervisor',      label: 'Operations Shift Supervisor'      },
+  { value: 'operations',          label: 'Operations Technician'            },
+  { value: 'mech_superintendent', label: 'Mechanical Superintendent'        },
+  { value: 'mech_supervisor',     label: 'Mechanical Supervisor'            },
+  { value: 'mechanical',          label: 'Mechanical Technician'            },
+  { value: 'elec_superintendent', label: 'Electrical Superintendent'        },
+  { value: 'elec_supervisor',     label: 'Electrical Supervisor'            },
+  { value: 'electrical',          label: 'Electrical Technician'            },
 ];
 function roleDisplay(role) {
   return (ROLE_OPTIONS.find(r => r.value === role) || {}).label || role;
@@ -239,8 +246,89 @@ function roleDisplay(role) {
 function isViewOnly(role) {
   return ['hse','superintendent','auditor'].includes(role);
 }
-function isAdminLevel(role) {
-  return role === 'admin';
+function isDeptSuperintendent(role) {
+  return role === 'mech_superintendent' || role === 'elec_superintendent';
+}
+
+// ── BOX CONFIG ────────────────────────────────────────────────────────────────
+const BOX_CONFIG = {
+  operations: { cols: ['A','B','C','D','E','F','G','H'], rows: 8 },
+  mechanical:  { cols: ['A','B','C','D','E'],             rows: 5 },
+  electrical:  { cols: ['A','B','C','D','E'],             rows: 5 },
+};
+function getBoxSlots(lockType) {
+  const cfg = BOX_CONFIG[lockType] || BOX_CONFIG.operations;
+  const slots = [];
+  for (let r = 1; r <= cfg.rows; r++) for (const c of cfg.cols) slots.push(`${c}${r}`);
+  return slots;
+}
+
+// ── BOX VIEW (reusable) ───────────────────────────────────────────────────────
+function BoxView({ lockType, locks }) {
+  const cfg   = BOX_CONFIG[lockType] || BOX_CONFIG.operations;
+  const slots = getBoxSlots(lockType);
+  const cols  = cfg.cols.length;
+  const color = lockColor(lockType);
+  const bySlot = {};
+  locks.filter(l => l.lock_type === lockType && l.status === 'applied' && l.box_slot)
+       .forEach(l => { bySlot[l.box_slot] = l; });
+  const applied  = locks.filter(l => l.lock_type === lockType && l.status === 'applied').length;
+  const available = locks.filter(l => l.lock_type === lockType && l.status === 'available').length;
+  const label = lockType.charAt(0).toUpperCase() + lockType.slice(1);
+  const size  = `${cols}×${cfg.rows}`;
+  return (
+    <div>
+      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:6, flexWrap:'wrap' }}>
+        <span style={{ fontSize:12, fontWeight:700, color }}>{label} Box ({size})</span>
+        <span style={{ fontSize:11, color:'var(--muted)' }}>
+          🔒 {applied} applied &nbsp;|&nbsp; 🔓 {available} available
+        </span>
+      </div>
+      <div className={`box-grid-${cols}`}>
+        {slots.map(slot => {
+          const lk = bySlot[slot];
+          return (
+            <div key={slot} className="box-slot"
+              style={{ borderColor: lk ? color : 'var(--b)', background: lk ? `${color}22` : 'var(--s2)', borderWidth: lk ? 2 : 1 }}
+              title={lk ? `${lk.lock_no} — key for lock on breaker` : `Slot ${slot} — empty`}>
+              <div className="box-slot-label">{slot}</div>
+              {lk && <span style={{ fontSize:8, fontWeight:800, color, marginTop:10 }}>{lk.lock_no}</span>}
+              {lk && <span style={{ fontSize:7 }}>🔑</span>}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── HOOKS VIEW (reusable) ─────────────────────────────────────────────────────
+function HooksView({ lockType, locks }) {
+  const hookClass = lockType === 'operations' ? 'ops' : lockType === 'mechanical' ? 'mech' : 'elec';
+  const typedLocks = locks.filter(l => l.lock_type === lockType);
+  const available = typedLocks.filter(l => l.status === 'available').length;
+  const label = lockType.charAt(0).toUpperCase() + lockType.slice(1);
+  return (
+    <div>
+      <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>
+        {label} Hooks — {available} available (lock + key on hook) &nbsp;|&nbsp;
+        {typedLocks.length - available} applied (lock on breaker, key in box)
+      </div>
+      <div className="hooks-board">
+        {typedLocks.map(l => (
+          <div key={l.id} className={`hook ${hookClass}`}
+            style={{ opacity: l.status === 'available' ? 1 : .35 }}
+            title={l.status === 'available' ? `${l.lock_no} — available on hook` : `${l.lock_no} — applied, key in box slot ${l.box_slot||'?'}`}>
+            <span style={{ fontSize:8 }}>{l.status === 'available' ? '🔓' : '🔒'}</span>
+            <span style={{ fontSize:9 }}>{l.lock_no}</span>
+            {l.status === 'applied' && l.box_slot && <span style={{ fontSize:7, color:'var(--warn)' }}>{l.box_slot}</span>}
+          </div>
+        ))}
+        {typedLocks.length === 0 &&
+          <div style={{ color:'var(--muted)', fontSize:12, padding:12 }}>No locks registered for this type.</div>}
+      </div>
+    </div>
+  );
 }
 
 // ── PRINT DANGER TAG ─────────────────────────────────────────────────────────
@@ -563,19 +651,18 @@ function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
 
   return (
     <div className="main">
-      <div className="card">
-        <div className="card-title">My Applied Locks ({myLocks.length})</div>
-        <div className="card-title" style={{ marginTop: 12, marginBottom: 6, fontSize: 11 }}>Hooks Board — Operations</div>
-        <div className="hooks-board">
-          {locks.filter(l => l.lock_type === 'operations').map(l => (
-            <div key={l.id} className={`hook ops`} style={{ opacity: l.status === 'available' ? .5 : 1 }}>
-              <span style={{ fontSize: 8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
-              <span style={{ fontSize: 9 }}>{l.lock_no}</span>
-              {l.box_slot && <span style={{ fontSize: 7, color: 'var(--muted)' }}>{l.box_slot}</span>}
-            </div>
-          ))}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <div className="card">
+          <div className="card-title">📦 Operations Box (8×8)</div>
+          <BoxView lockType="operations" locks={locks} />
+        </div>
+        <div className="card">
+          <div className="card-title">🪝 Operations Hooks</div>
+          <HooksView lockType="operations" locks={locks} />
         </div>
       </div>
+      <div className="card">
+        <div className="card-title">My Applied Locks ({myLocks.length})</div>
       <div className="card">
         {myLocks.length === 0 && <div className="empty">No active locks applied.</div>}
         {myLocks.map(l => {
@@ -640,6 +727,16 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
           <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>
         </div>
       )}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <div className="card">
+          <div className="card-title">📦 {myLockType.charAt(0).toUpperCase()+myLockType.slice(1)} Box (5×5)</div>
+          <BoxView lockType={myLockType} locks={locks} />
+        </div>
+        <div className="card">
+          <div className="card-title">🪝 {myLockType.charAt(0).toUpperCase()+myLockType.slice(1)} Hooks</div>
+          <HooksView lockType={myLockType} locks={locks} />
+        </div>
+      </div>
       <div className="card">
         <div className="card-title">Smart List — Ready for {myLockType} lockout ({smartList.length})</div>
         {smartList.length === 0 && <div className="empty">No equipment awaiting {myLockType} lockout.</div>}
@@ -913,8 +1010,7 @@ function SuperLocks({ locks, equipment, onRefresh }) {
   const [err, setErr] = useState('');
   const [filterType, setFilterType] = useState('all');
 
-  const BOX_SLOTS = [];
-  for (let r = 1; r <= 8; r++) for (const c of ['A','B','C','D','E','F','G','H']) BOX_SLOTS.push(`${c}${r}`);
+  const BOX_SLOTS = getBoxSlots('operations');
 
   const handleAdd = async () => {
     if (!form.lock_no) { setErr('Lock number required.'); return; }
@@ -1410,6 +1506,96 @@ function MechElecApp({ session, equipment, locks, onRefresh }) {
   );
 }
 
+// ── DEPT SUPERINTENDENT APP (MECH / ELEC — VIEW ONLY) ────────────────────────
+function DeptSuperintendentApp({ session, equipment, locks }) {
+  const lockType  = roleLockType(session.role);
+  const label     = lockType === 'mechanical' ? 'Mechanical' : 'Electrical';
+  const boxSize   = '5×5';
+  const [tab, setTab] = useState('box');
+  const myLocks   = locks.filter(l => l.lock_type === lockType);
+  const applied   = myLocks.filter(l => l.status === 'applied');
+  const available = myLocks.filter(l => l.status === 'available');
+  const violations = equipment.filter(eq => {
+    const hasMine = locks.some(l => l.equipment_id === eq.id && l.lock_type === lockType && l.status === 'applied');
+    const hasOps  = locks.some(l => l.equipment_id === eq.id && l.lock_type === 'operations' && l.status === 'applied');
+    return hasMine && !hasOps;
+  });
+  return (
+    <>
+      <div className="tabs">
+        <button className={`tab ${tab==='box'    ?'on':''}`} onClick={() => setTab('box')}>📦 Box & Hooks</button>
+        <button className={`tab ${tab==='locks'  ?'on':''}`} onClick={() => setTab('locks')}>🔒 Active Locks</button>
+        <button className={`tab ${tab==='reports'?'on':''}`} onClick={() => setTab('reports')}>📋 Reports</button>
+      </div>
+      {tab === 'box' && (
+        <div className="main">
+          {violations.length > 0 && (
+            <div className="seq-alert">
+              ⚠ <strong>Sequence Violation:</strong> {violations.length} equipment has {label} lock but NO Operations lock — {violations.map(v=>v.tag).join(', ')}
+            </div>
+          )}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <div className="card">
+              <div className="card-title">📦 {label} Box ({boxSize})</div>
+              <BoxView lockType={lockType} locks={locks} />
+            </div>
+            <div className="card">
+              <div className="card-title">🪝 {label} Hooks Board</div>
+              <HooksView lockType={lockType} locks={locks} />
+            </div>
+          </div>
+          <div className="card">
+            <div className="stats-grid" style={{ gridTemplateColumns:'repeat(3,1fr)' }}>
+              {[
+                { num: myLocks.length,   label: 'Total Locks',     color: lockColor(lockType) },
+                { num: applied.length,   label: 'Applied (in use)', color: '#ef4444' },
+                { num: available.length, label: 'Available (hook)', color: '#22c55e' },
+              ].map((s,i) => (
+                <div key={i} className="stat-card">
+                  <div className="stat-num" style={{ color: s.color }}>{s.num}</div>
+                  <div className="stat-label">{s.label}</div>
+                  <div className="stat-bar" style={{ background: s.color, opacity:.3 }} />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === 'locks' && (
+        <div className="main">
+          <div className="card">
+            <div className="card-title">Applied {label} Locks ({applied.length})</div>
+            {applied.length === 0 && <div className="empty">No {lockType} locks currently applied.</div>}
+            <div className="ovr-x">
+              <table>
+                <thead><tr><th>Lock No</th><th>Equipment</th><th>Location</th><th>Applied By</th><th>Reason</th><th>Permit</th><th>Box Slot</th><th>Applied At</th></tr></thead>
+                <tbody>
+                  {applied.map(l => {
+                    const eq = equipment.find(e => e.id === l.equipment_id);
+                    return (
+                      <tr key={l.id}>
+                        <td style={{ fontFamily:'monospace', fontWeight:700, color:lockColor(lockType) }}>{l.lock_no}</td>
+                        <td>{eq ? eq.tag : '—'}</td>
+                        <td style={{ fontSize:11, color:'var(--muted)' }}>{eq ? `${eq.plant}→${eq.mcc_room}→${eq.rack}→${eq.row_position}` : '—'}</td>
+                        <td>{l.applied_by}</td>
+                        <td>{l.reason||'—'}</td>
+                        <td>{l.permit||'—'}</td>
+                        <td style={{ fontFamily:'monospace', color:'var(--warn)' }}>{l.box_slot||'—'}</td>
+                        <td style={{ fontSize:11 }}>{l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      {tab === 'reports' && <SuperReports session={session} />}
+    </>
+  );
+}
+
 // ── OPS SUPERVISOR: ALL OPS LOCKS TAB ────────────────────────────────────────
 function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
   const allOps = locks.filter(l => l.lock_type === 'operations' && l.status === 'applied');
@@ -1418,24 +1604,20 @@ function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
   const displayed = shiftOnly ? allOps.filter(l => l.applied_id_no === session.id_no) : allOps;
   return (
     <div className="main">
-      <div className="card">
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12, flexWrap:'wrap', gap:8 }}>
-          <div className="card-title" style={{ margin:0 }}>Operations Locks — All Shifts ({allOps.length})</div>
-          <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
-            <input type="checkbox" checked={shiftOnly} onChange={e => setShiftOnly(e.target.checked)} />
-            My locks only
-          </label>
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <div className="card">
+          <div className="card-title">📦 Operations Box (8×8)</div>
+          <BoxView lockType="operations" locks={locks} />
         </div>
-        <div className="hooks-board">
-          {locks.filter(l => l.lock_type === 'operations').map(l => (
-            <div key={l.id} className="hook ops" style={{ opacity: l.status === 'available' ? .4 : 1 }}>
-              <span style={{ fontSize:8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
-              <span style={{ fontSize:9 }}>{l.lock_no}</span>
-              {l.box_slot && <span style={{ fontSize:7, color:'var(--muted)' }}>{l.box_slot}</span>}
-            </div>
-          ))}
-          {locks.filter(l => l.lock_type === 'operations').length === 0 &&
-            <div className="empty">No operations locks in system.</div>}
+        <div className="card">
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6, flexWrap:'wrap', gap:8 }}>
+            <div className="card-title" style={{ margin:0 }}>🪝 Hooks — All Shifts ({allOps.length})</div>
+            <label style={{ display:'flex', alignItems:'center', gap:6, fontSize:12, cursor:'pointer' }}>
+              <input type="checkbox" checked={shiftOnly} onChange={e => setShiftOnly(e.target.checked)} />
+              My locks only
+            </label>
+          </div>
+          <HooksView lockType="operations" locks={locks} />
         </div>
       </div>
       <div className="card">
@@ -1486,18 +1668,14 @@ function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
   const hookClass = lockType === 'mechanical' ? 'mech' : 'elec';
   return (
     <div className="main">
-      <div className="card">
-        <div className="card-title">All {lockType.charAt(0).toUpperCase()+lockType.slice(1)} Locks — Team View ({allLocks.length})</div>
-        <div className="hooks-board">
-          {locks.filter(l => l.lock_type === lockType).map(l => (
-            <div key={l.id} className={`hook ${hookClass}`} style={{ opacity: l.status === 'available' ? .4 : 1 }}>
-              <span style={{ fontSize:8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
-              <span style={{ fontSize:9 }}>{l.lock_no}</span>
-              {l.box_slot && <span style={{ fontSize:7, color:'var(--muted)' }}>{l.box_slot}</span>}
-            </div>
-          ))}
-          {locks.filter(l => l.lock_type === lockType).length === 0 &&
-            <div className="empty">No {lockType} locks in system.</div>}
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <div className="card">
+          <div className="card-title">📦 {lockType.charAt(0).toUpperCase()+lockType.slice(1)} Box (5×5)</div>
+          <BoxView lockType={lockType} locks={locks} />
+        </div>
+        <div className="card">
+          <div className="card-title">🪝 Team Hooks Board</div>
+          <HooksView lockType={lockType} locks={locks} />
         </div>
       </div>
       <div className="card">
@@ -1783,10 +1961,11 @@ function App() {
           <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Sign Out</button>
         </div>
       </nav>
-      {session.role === 'admin'          && <SupervisorApp    session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {isViewOnly(session.role)           && <ReadOnlyApp      session={session} equipment={equipment} locks={locks} />}
-      {session.role === 'ops_supervisor'  && <OpsSupervisorApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {session.role === 'operations'      && <OperationsApp    session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'admin'               && <SupervisorApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {isViewOnly(session.role)                && <ReadOnlyApp          session={session} equipment={equipment} locks={locks} />}
+      {isDeptSuperintendent(session.role)      && <DeptSuperintendentApp session={session} equipment={equipment} locks={locks} />}
+      {session.role === 'ops_supervisor'       && <OpsSupervisorApp     session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'operations'           && <OperationsApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       <Toasts />
