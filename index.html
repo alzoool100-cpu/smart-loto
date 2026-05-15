@@ -1191,7 +1191,7 @@ function SuperLocks({ locks, equipment, onRefresh }) {
       <div className="card">
         <div className="section-header"><div className="card-title" style={{ margin: 0 }}>Box Slot Visualization (8×8)</div></div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Columns A–H, Rows 1–8 | 🔒 = applied, color = lock type</div>
-        <div className="box-grid">
+        <div className="box-grid-8">
           {BOX_SLOTS.map(slot => {
             const applied = locks.find(l => l.box_slot === slot && l.status === 'applied');
             const avail   = locks.find(l => l.box_slot === slot && l.status === 'available');
@@ -2131,6 +2131,9 @@ function App() {
       {session.role === 'operations'           && <OperationsApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {!['admin','hse','superintendent','auditor','ops_supervisor','operations','mech_superintendent','mech_supervisor','mechanical','elec_superintendent','elec_supervisor','electrical'].includes(session.role) && (
+        <div className="main"><div className="alert alert-danger">Unknown role "{session.role}". Please sign out and log in again.</div></div>
+      )}
       <Toasts />
     </>
   );
