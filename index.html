@@ -1,0 +1,752 @@
+﻿<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart LOTO — نظام إدارة الأقفال</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:#07101E;font-family:'Tajawal',sans-serif;color:#E2E8F0;min-height:100vh}
+:root{--bg:#07101E;--s1:#0D1829;--s2:#122035;--s3:#1A2D47;--b:#1E3050;--accent:#00C9A7;--danger:#EF4444;--warn:#F59E0B;--muted:#64748B}
+.app{min-height:100vh;direction:rtl}
+.nav{background:linear-gradient(135deg,#060D1A,#0D1E38);border-bottom:1px solid var(--b);padding:10px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:9px;margin-left:auto}
+.bi{width:38px;height:38px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px}
+.bt{font-size:16px;font-weight:900;color:#fff}.bs{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
+.live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.25);border-radius:20px;padding:3px 10px}
+.ld{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite;display:inline-block}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+.rbar{background:var(--s1);border-bottom:1px solid var(--b);padding:8px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.rbtn{padding:5px 12px;border-radius:7px;border:1px solid var(--b);background:none;color:var(--muted);font-size:12px;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .2s}
+.rbtn.on{font-weight:800;color:#000}
+.abtn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 14px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:800;cursor:pointer}
+.abtn.s{background:var(--s3);color:var(--accent);border:1px solid var(--accent)}
+.tbar{background:var(--s1);border-bottom:1px solid var(--b);padding:0 18px;display:flex;overflow-x:auto}
+.tb{padding:10px 14px;border:none;background:none;color:var(--muted);font-size:12px;font-family:'Tajawal',sans-serif;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tb.on{color:#fff;font-weight:800;border-bottom-color:var(--accent)}
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:16px;color:var(--muted)}
+.spin{width:44px;height:44px;border:3px solid var(--b);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.errbox{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:24px;margin:30px;text-align:center;color:var(--danger)}
+.vbar{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:9px;padding:9px 14px;display:flex;align-items:center;gap:10px;margin:12px 18px 0}
+.main{padding:14px 18px;display:flex;flex-direction:column;gap:14px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+@media(max-width:600px){.stats{grid-template-columns:repeat(3,1fr)}.lay{grid-template-columns:1fr!important}.bhs{grid-template-columns:1fr!important}.inv3{grid-template-columns:1fr!important}}
+.stat{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
+.sn{font-size:24px;font-weight:900;font-family:'IBM Plex Mono',monospace}.sl{font-size:11px;color:var(--muted);margin-top:1px}
+.sb{position:absolute;bottom:0;left:0;right:0;height:3px}
+.sbar{background:var(--s1);border:1px solid var(--b);border-radius:9px;padding:9px 13px;display:flex;gap:9px;align-items:center}
+.si{flex:1;background:none;border:none;outline:none;color:#E2E8F0;font-size:14px;text-align:right;direction:rtl;font-family:'IBM Plex Mono',monospace}
+.si::placeholder{color:var(--muted)}
+.frow{display:flex;gap:6px;flex-wrap:wrap}
+.fb{padding:4px 11px;border-radius:20px;border:1px solid var(--b);background:none;color:var(--muted);font-size:11px;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .2s}
+.fb.on{font-weight:800;color:#000}
+.lay{display:grid;grid-template-columns:1fr 290px;gap:14px}
+.stitle{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.eql{display:flex;flex-direction:column;gap:6px}
+.eq{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .2s}
+.eq:hover,.eq.sel{border-color:var(--accent);background:var(--s2)}
+.eq.viol{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.03)}
+.eq.dc{opacity:.6;border-style:dashed}
+.etag{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#fff}
+.ename{font-size:12px;color:var(--muted);margin-top:1px}
+.epath{display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap}
+.pt{background:var(--s3);border:1px solid var(--b);border-radius:4px;padding:2px 7px;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
+.stt{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;border:1px solid;white-space:nowrap;margin-right:auto}
+.lrow{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
+.lc{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid;font-family:'IBM Plex Mono',monospace}
+.lo{width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#000;flex-shrink:0}
+.det{background:var(--s2);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-top:10px}
+.dtitle{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--b);font-size:12px}
+.dr:last-child{border:none}.dk{color:var(--muted)}.dv{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:11px}
+.nb{width:100%;margin-top:8px;padding:8px;border-radius:8px;border:none;background:var(--s3);color:var(--accent);font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
+.alb{padding:8px;border-radius:7px;border:1px dashed var(--accent);background:none;color:var(--accent);font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;text-align:center;margin-top:6px;width:100%}
+.rlb{padding:7px;border-radius:7px;border:1px solid var(--danger);background:none;color:var(--danger);font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;margin-top:4px;width:100%}
+.rlb:hover{background:rgba(239,68,68,.1)}
+.rp{display:flex;flex-direction:column;gap:10px}
+.pb{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px}
+.bhs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.bpan,.hpan{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:14px}
+.bgrid{display:grid;grid-template-columns:18px repeat(8,1fr);gap:2px}
+.bgh{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center;height:18px}
+.bsl{aspect-ratio:1;border-radius:4px;border:1px solid var(--b);background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;cursor:pointer;transition:all .15s}
+.bsl.hk:hover{transform:scale(1.08);z-index:2}.bsl.hl{box-shadow:0 0 0 2px var(--accent);transform:scale(1.1);z-index:3}
+.bno{font-family:'IBM Plex Mono',monospace;font-size:7px;font-weight:700;line-height:1}
+.hgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.hook{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:8px;border:1px solid var(--b);background:var(--bg);min-height:62px;transition:all .2s}
+.hook.av{cursor:pointer}.hook.av:hover{border-color:var(--accent)}.hook.em{opacity:.3;border-style:dashed}
+.hpeg{width:2px;height:10px;background:var(--muted);border-radius:2px;opacity:.6}
+.inv3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ic{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px}
+.ir{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b)}.ir:last-child{border:none}
+.twrap{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:14px}
+.th2{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
+table{width:100%;border-collapse:collapse;font-size:11px;overflow-x:auto;display:block}
+th{background:var(--s3);padding:7px 10px;text-align:right;color:var(--muted);font-weight:700;border-bottom:1px solid var(--b);white-space:nowrap}
+td{padding:7px 10px;border-bottom:1px solid var(--b);font-family:'IBM Plex Mono',monospace;white-space:nowrap}
+tr:last-child td{border:none}tr:hover td{background:var(--s2)}
+.rt{background:none;border:1px solid var(--danger);color:var(--danger);border-radius:5px;padding:3px 8px;font-size:10px;font-family:'Tajawal',sans-serif;cursor:pointer}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:flex;align-items:center;justify-content:center;padding:14px}
+.modal{background:var(--s1);border:1px solid var(--b);border-radius:14px;padding:18px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;direction:rtl}
+.mt{font-size:15px;font-weight:900;margin-bottom:14px}
+.fg{margin-bottom:10px}.fl{font-size:11px;color:var(--muted);margin-bottom:4px;display:block}
+.fi,.fs{width:100%;background:var(--bg);border:1px solid var(--b);border-radius:7px;padding:8px 11px;color:#E2E8F0;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;direction:rtl;text-align:right}
+.fi:focus,.fs:focus{border-color:var(--accent)}.fs option{background:var(--s1)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mac{display:flex;gap:8px;margin-top:14px}
+.can{flex:1;background:none;border:1px solid var(--b);color:var(--muted);border-radius:8px;padding:8px;font-family:'Tajawal',sans-serif;font-size:13px;cursor:pointer}
+.con{flex:2;background:var(--accent);color:#000;border:none;border-radius:8px;padding:8px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:800;cursor:pointer}
+.con:disabled{opacity:.35;cursor:not-allowed}
+.ib{background:rgba(0,201,167,.06);border:1px solid rgba(0,201,167,.2);border-radius:8px;padding:10px;font-size:12px;color:var(--accent);margin-bottom:12px;line-height:1.7}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;margin:3px;transition:all .2s}
+.chip.pk{box-shadow:0 0 0 2px var(--accent)}
+.empty{text-align:center;padding:28px;color:var(--muted);font-size:13px}
+.ss{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
+.sn2{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#000;flex-shrink:0}
+.exp{background:var(--s3);color:#E2E8F0;border:1px solid var(--b);border-radius:6px;padding:5px 12px;font-size:11px;font-family:'Tajawal',sans-serif;cursor:pointer}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:10px 24px;border-radius:20px;font-weight:800;font-size:13px;z-index:999;white-space:nowrap;animation:fup .3s ease}
+@keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react" charset="utf-8">
+const { useState, useEffect, useCallback, Fragment } = React;
+const { createClient } = supabase;
+
+const SUPABASE_URL = "https://nbgmfvzrfylmhzwjwewl.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZ21mdnpyZnlsbWh6d2p3ZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2OTIyODMsImV4cCI6MjA5NDI2ODI4M30.Ir8-Ot9xib5wulL1uV2S8HKl1lTB1Ou8wlpuJe-tixg";
+
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const LT = {
+  operations:{label:"مشغل",color:"#22C55E",icon:"🟢",hex:"22C55E"},
+  mechanical:{label:"ميكانيكي",color:"#3B82F6",icon:"🔵",hex:"3B82F6"},
+  electrical:{label:"كهربائي",color:"#EF4444",icon:"🔴",hex:"EF4444"}
+};
+const RI = {
+  supervisor:{label:"مشرف",icon:"⭐",color:"#F59E0B"},
+  operations:{label:"مشغل",icon:"🟢",color:"#22C55E"},
+  mechanical:{label:"ميكانيكا",icon:"🔵",color:"#3B82F6"},
+  electrical:{label:"كهرباء",icon:"🔴",color:"#EF4444"}
+};
+const REASONS = ["صيانة روتينية","استبدال كابلنج","استبدال بيرينج","استبدال ختم / سيل","فحص ومعاينة","أعمال كهربائية","صيانة صمام","استبدال موتور","معدة ملغاة","أخرى"];
+const BC=["A","B","C","D","E","F","G","H"],BR=[1,2,3,4,5,6,7,8];
+const SLOTS=BC.flatMap(c=>BR.map(r=>`${c}${r}`));
+
+function eqSt(id,locks){
+  const al=locks.filter(l=>l.status==="applied"&&l.equipment_id===id);
+  const op=al.some(l=>l.lock_type==="operations");
+  const mn=al.some(l=>l.lock_type!=="operations");
+  if(!op&&mn)return"violation";if(op&&mn)return"locked_safe";if(op)return"ops_only";return"clear";
+}
+const SI={
+  violation:{label:"🚨 خطأ تسلسل",color:"#EF4444",bg:"rgba(239,68,68,.12)"},
+  locked_safe:{label:"🔒 مغلق صحيح",color:"#22C55E",bg:"rgba(34,197,94,.1)"},
+  ops_only:{label:"⏳ بانتظار صيانة",color:"#F59E0B",bg:"rgba(245,158,11,.1)"},
+  clear:{label:"✅ متاحة",color:"#64748B",bg:"rgba(100,116,139,.07)"},
+  decomm:{label:"⚠️ ملغاة",color:"#64748B",bg:"rgba(100,116,139,.07)"}
+};
+
+function App() {
+  const [role,setRole]=useState("supervisor");
+  const [tab,setTab]=useState("dashboard");
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState(null);
+  const [toast,setToast]=useState(null);
+  const [eq,setEq]=useState([]);
+  const [locks,setLocks]=useState([]);
+  const [staff,setStaff]=useState([]);
+  const [rooms,setRooms]=useState({});
+  const [log,setLog]=useState([]);
+  const [search,setSearch]=useState("");
+  const [roomF,setRoomF]=useState("all");
+  const [sel,setSel]=useState(null);
+  const [hlSlot,setHlSlot]=useState(null);
+  const [selRoom,setSelRoom]=useState(null);
+  const [showApply,setShowApply]=useState(null);
+  const [showAddEq,setShowAddEq]=useState(false);
+  const [showAddLk,setShowAddLk]=useState(false);
+  const [pickedLk,setPickedLk]=useState("");
+  const [pickedSl,setPickedSl]=useState("");
+  const [aForm,setAForm]=useState({appliedBy:"",idNo:"",reason:"صيانة روتينية",permit:""});
+  const [eForm,setEForm]=useState({tag:"",name:"",mcc_room:"60K-A",rack:"SA.14",row_position:"",permit:""});
+  const [lForm,setLForm]=useState({lock_no:"",lock_type:"operations"});
+
+  function showT(m){setToast(m);setTimeout(()=>setToast(null),2800);}
+
+  const load=useCallback(async()=>{
+    try{
+      setError(null);
+      const [eRes,lRes,sRes,rRes,lgRes]=await Promise.all([
+        db.from("equipment").select("*").order("tag"),
+        db.from("locks").select("*,equipment:equipment_id(tag,name,mcc_room,rack,row_position)").order("lock_no"),
+        db.from("personnel").select("*").eq("active",true).order("full_name"),
+        db.from("mcc_rooms").select("*").order("code"),
+        db.from("audit_log").select("*").order("action_at",{ascending:false}).limit(100),
+      ]);
+      if(eRes.error)throw eRes.error;
+      if(lRes.error)throw lRes.error;
+      setEq(eRes.data||[]);setLocks(lRes.data||[]);setStaff(sRes.data||[]);
+      const rm={};(rRes.data||[]).forEach(x=>{rm[x.code]=x;});setRooms(rm);
+      setLog(lgRes.data||[]);
+    }catch(err){setError(err.message||"خطأ في الاتصال");}
+    finally{setLoading(false);}
+  },[]);
+
+  useEffect(()=>{load();},[]);
+  useEffect(()=>{const t=setInterval(load,30000);return()=>clearInterval(t);},[]);
+
+  const applied=locks.filter(l=>l.status==="applied");
+  const avail=locks.filter(l=>l.status==="available");
+  const eqLocks=id=>locks.filter(l=>l.status==="applied"&&l.equipment_id===id);
+  const violations=eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="violation");
+  const boxMap={};applied.forEach(l=>{if(l.box_slot)boxMap[l.box_slot]=l;});
+  function nextSlot(){const u=new Set(applied.map(l=>l.box_slot).filter(Boolean));return SLOTS.find(s=>!u.has(s))||"";}
+  const inv={
+    operations:{t:locks.filter(l=>l.lock_type==="operations").length,a:applied.filter(l=>l.lock_type==="operations").length,v:avail.filter(l=>l.lock_type==="operations").length},
+    mechanical:{t:locks.filter(l=>l.lock_type==="mechanical").length,a:applied.filter(l=>l.lock_type==="mechanical").length,v:avail.filter(l=>l.lock_type==="mechanical").length},
+    electrical:{t:locks.filter(l=>l.lock_type==="electrical").length,a:applied.filter(l=>l.lock_type==="electrical").length,v:avail.filter(l=>l.lock_type==="electrical").length}
+  };
+  const vis=eq.filter(e=>{
+    if(roomF!=="all"&&e.mcc_room!==roomF)return false;
+    if(search.trim()){const q=search.trim().toUpperCase();return e.tag.toUpperCase().includes(q)||e.name.toUpperCase().includes(q)||eqLocks(e.id).some(l=>l.lock_no.toUpperCase().includes(q));}
+    return true;
+  });
+
+  async function applyLock(eqId){
+    const e=eq.find(x=>x.id===eqId);
+    const {error:e1}=await db.from("locks").update({status:"applied",equipment_id:eqId,box_slot:pickedSl,applied_by:aForm.appliedBy,applied_id_no:aForm.idNo,reason:aForm.reason,permit:aForm.permit,applied_at:new Date().toISOString()}).eq("lock_no",pickedLk);
+    if(e1){alert("خطأ: "+e1.message);return;}
+    await db.from("audit_log").insert({action:"APPLIED",lock_no:pickedLk,lock_type:locks.find(l=>l.lock_no===pickedLk)?.lock_type,eq_tag:e?.tag,eq_name:e?.name,by_name:aForm.appliedBy,by_id_no:aForm.idNo,reason:aForm.reason,box_slot:pickedSl});
+    await load();setShowApply(null);setPickedLk("");setPickedSl("");setAForm({appliedBy:"",idNo:"",reason:"صيانة روتينية",permit:""});
+    showT("✅ تم تطبيق القفل "+pickedLk+" — المفتاح في خانة "+pickedSl);
+  }
+
+  async function removeLock(lockNo){
+    const lk=locks.find(l=>l.lock_no===lockNo);
+    const e=eq.find(x=>x.id===lk?.equipment_id);
+    const {error:e1}=await db.from("locks").update({status:"available",equipment_id:null,box_slot:null,applied_by:null,applied_id_no:null,reason:null,permit:null,applied_at:null}).eq("lock_no",lockNo);
+    if(e1){alert("خطأ: "+e1.message);return;}
+    await db.from("audit_log").insert({action:"REMOVED",lock_no:lockNo,lock_type:lk?.lock_type,eq_tag:e?.tag,by_name:lk?.applied_by,reason:lk?.reason,box_slot:lk?.box_slot});
+    await load();setHlSlot(null);setSel(null);showT("🔓 تم إزالة القفل "+lockNo);
+  }
+
+  async function addEq(){
+    const {error:e1}=await db.from("equipment").insert(eForm);
+    if(e1){alert("خطأ: "+e1.message);return;}
+    await db.from("audit_log").insert({action:"ADDED_EQ",eq_tag:eForm.tag,eq_name:eForm.name});
+    await load();setShowAddEq(false);setEForm({tag:"",name:"",mcc_room:"60K-A",rack:"SA.14",row_position:"",permit:""});showT("✅ تمت إضافة المعدة");
+  }
+
+  async function addLk(){
+    const {error:e1}=await db.from("locks").insert({lock_no:lForm.lock_no,lock_type:lForm.lock_type,status:"available"});
+    if(e1){alert("خطأ: "+e1.message);return;}
+    await db.from("audit_log").insert({action:"ADDED_LOCK",lock_no:lForm.lock_no,lock_type:lForm.lock_type});
+    await load();setShowAddLk(false);setLForm({lock_no:"",lock_type:"operations"});showT("✅ تمت إضافة القفل "+lForm.lock_no);
+  }
+
+  function exportCSV(){
+    const rows=[["📦","القفل","النوع","المعدة","الغرفة","الراك","الصف","السبب","المنفذ","التاريخ"],...applied.map(l=>[l.box_slot,l.lock_no,l.lock_type,l.equipment?.tag,l.equipment?.mcc_room,l.equipment?.rack,l.equipment?.row_position,l.reason,l.applied_by,l.applied_at?.slice(0,10)])];
+    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"}));a.download="SmartLOTO_"+(new Date().toISOString().slice(0,10))+".csv";a.click();
+  }
+
+  const selEq=sel?eq.find(e=>e.id===sel):null;
+  const selSt=selEq?(selEq.decommissioned?"decomm":eqSt(selEq.id,locks)):null;
+  const isSup=role==="supervisor";
+
+  if(loading)return(
+    <div className="loading">
+      <div className="spin"/>
+      <div style={{color:"var(--accent)",fontSize:14}}>جارٍ تحميل Smart LOTO...</div>
+      <div style={{fontSize:11,color:"var(--muted)"}}>الاتصال بـ Supabase</div>
+    </div>
+  );
+
+  if(error)return(
+    <div className="errbox">
+      <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
+      <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>خطأ في الاتصال</div>
+      <div style={{fontSize:12,opacity:.8,marginBottom:16,wordBreak:"break-all"}}>{error}</div>
+      <button onClick={()=>{setLoading(true);load();}} style={{padding:"10px 24px",borderRadius:8,border:"none",background:"var(--danger)",color:"#fff",cursor:"pointer",fontFamily:"Tajawal",fontSize:14,fontWeight:700}}>🔄 إعادة المحاولة</button>
+    </div>
+  );
+
+  return (
+    <div className="app">
+      <div className="nav">
+        <div className="live"><span className="ld"/>مباشر ✅</div>
+        {violations.length>0&&<span style={{fontSize:12,color:"var(--danger)",fontWeight:700}}>🚨 {violations.length} انتهاك</span>}
+        <div className="brand">
+          <div className="bi">🔒</div>
+          <div><div className="bt">Smart LOTO</div><div className="bs">LOCKOUT/TAGOUT MANAGEMENT</div></div>
+        </div>
+      </div>
+
+      <div className="rbar">
+        <span style={{fontSize:11,color:"var(--muted)"}}>الدخول كـ:</span>
+        {Object.entries(RI).map(([k,v])=>(
+          <button key={k} className={"rbtn"+(role===k?" on":"")} style={role===k?{background:v.color,borderColor:v.color}:{}} onClick={()=>setRole(k)}>{v.icon} {v.label}</button>
+        ))}
+        {isSup&&<div style={{display:"flex",gap:6,marginRight:"auto"}}>
+          <button className="abtn" onClick={()=>setShowAddEq(true)}>+ معدة</button>
+          <button className="abtn s" onClick={()=>setShowAddLk(true)}>+ قفل</button>
+          <button className="abtn s" onClick={()=>{setLoading(true);load();}}>🔄</button>
+        </div>}
+      </div>
+
+      <div className="tbar">
+        {[["dashboard","📊 لوحة التحكم"],["locks","🔑 الأقفال"],["rooms","🏭 غرف MCC"],["reports","📋 تقارير"]].map(([k,v])=>(
+          <button key={k} className={"tb"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{v}</button>
+        ))}
+      </div>
+
+      {violations.length>0&&tab==="dashboard"&&(
+        <div className="vbar">
+          <span style={{fontSize:20}}>🚨</span>
+          <div>
+            <div style={{fontWeight:700,color:"var(--danger)",fontSize:13}}>انتهاك تسلسل! {violations.length} معدة عليها قفل صيانة بدون قفل مشغل</div>
+            <div style={{fontSize:11,color:"rgba(239,68,68,.7)",marginTop:2}}>{violations.map(v=>v.tag).join(" · ")}</div>
+          </div>
+        </div>
+      )}
+
+      {tab==="dashboard"&&(
+        <div className="main">
+          <div className="stats">
+            {[["#EF4444",violations.length,"🚨 انتهاك"],["#22C55E",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="locked_safe").length,"🔒 مغلق صحيح"],["#F59E0B",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="ops_only").length,"⏳ بانتظار"],["var(--accent)",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="clear").length,"✅ متاحة"],["var(--muted)",applied.length,"🔑 مطبقة"]].map(([c,n,l])=>(
+              <div key={l} className="stat"><div className="sn" style={{color:c}}>{n}</div><div className="sl">{l}</div><div className="sb" style={{background:c}}/></div>
+            ))}
+          </div>
+          <div className="sbar"><span>🔍</span><input className="si" placeholder="ابحث برقم المعدة أو القفل..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
+          <div className="frow">
+            <button className={"fb"+(roomF==="all"?" on":"")} style={roomF==="all"?{background:"var(--accent)",borderColor:"var(--accent)"}:{}} onClick={()=>setRoomF("all")}>الكل</button>
+            {Object.entries(rooms).map(([k,v])=>(
+              <button key={k} className={"fb"+(roomF===k?" on":"")} style={roomF===k?{background:v.color,borderColor:v.color}:{}} onClick={()=>setRoomF(k)}>{k}</button>
+            ))}
+          </div>
+          <div className="lay">
+            <div>
+              <div className="stitle">المعدات ({vis.length})</div>
+              {eq.length===0&&<div className="empty"><div style={{fontSize:40,marginBottom:8}}>🏭</div><div style={{fontWeight:700}}>لا توجد معدات بعد</div><div style={{fontSize:11,marginTop:6,color:"var(--muted)"}}>اضغط "+ معدة" لإضافة أول معدة</div></div>}
+              <div className="eql">
+                {vis.map(e=>{
+                  const st=e.decommissioned?"decomm":eqSt(e.id,locks),si=SI[st],el=eqLocks(e.id),rm=rooms[e.mcc_room];
+                  return(
+                    <div key={e.id} className={"eq"+(sel===e.id?" sel":"")+(st==="violation"?" viol":"")+(e.decommissioned?" dc":"")} onClick={()=>setSel(sel===e.id?null:e.id)}>
+                      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
+                        <div style={{flex:1}}>
+                          <div className="etag">{e.tag}</div>
+                          <div className="ename">{e.name}</div>
+                          <div className="epath">
+                            <span className="pt" style={{color:rm?.color||"var(--muted)"}}>{e.mcc_room}</span>
+                            <span style={{color:"var(--muted)",fontSize:10}}>›</span>
+                            <span className="pt">{e.rack}</span>
+                            <span style={{color:"var(--muted)",fontSize:10}}>›</span>
+                            <span className="pt">صف {e.row_position}</span>
+                          </div>
+                        </div>
+                        <span className="stt" style={{color:si.color,borderColor:si.color+"55",background:si.bg}}>{si.label}</span>
+                      </div>
+                      <div className="lrow">
+                        {el.length===0&&<span style={{fontSize:10,color:"var(--muted)"}}>لا توجد أقفال</span>}
+                        {el.map((l,i)=>{const lt=LT[l.lock_type];return(
+                          <span key={l.lock_no} className="lc" style={{color:lt.color,borderColor:lt.color+"44",background:lt.color+"11"}}>
+                            <span className="lo" style={{background:lt.color}}>{i+1}</span>
+                            {lt.icon}{l.lock_no}
+                            <span style={{fontSize:9,color:"var(--muted)"}}>📦{l.box_slot}</span>
+                          </span>
+                        );})}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {selEq&&(
+                <div className="det">
+                  <div className="dtitle">{SI[selSt].label} <span style={{fontFamily:"monospace",fontSize:13,color:"#fff"}}>{selEq.tag}</span></div>
+                  {[["الاسم",selEq.name],["الغرفة",rooms[selEq.mcc_room]?.label||selEq.mcc_room],["الراك",selEq.rack],["الصف",selEq.row_position],["التصريح",selEq.permit||"—"]].map(([k,v])=>(
+                    <div key={k} className="dr"><span className="dk">{k}</span><span className="dv">{v}</span></div>
+                  ))}
+                  {eqLocks(selEq.id).length>0&&(
+                    <div style={{marginTop:10,borderTop:"1px solid var(--b)",paddingTop:10}}>
+                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontWeight:700}}>الأقفال المطبقة:</div>
+                      {eqLocks(selEq.id).map((l,i)=>{const lt=LT[l.lock_type];return(
+                        <div key={l.lock_no} style={{background:lt.color+"0D",border:"1px solid "+lt.color+"33",borderRadius:7,padding:"7px 10px",marginBottom:5,fontSize:11}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span style={{color:lt.color,fontWeight:900}}>{i+1}. {lt.icon} {l.lock_no} — {lt.label}</span>
+                            <span style={{color:"var(--warn)",fontFamily:"monospace",fontWeight:700}}>📦 {l.box_slot}</span>
+                          </div>
+                          <div style={{color:"var(--muted)",marginTop:2}}>{l.applied_by} · {l.reason}</div>
+                        </div>
+                      );})}
+                    </div>
+                  )}
+                  <button className="nb" onClick={()=>{setTab("rooms");setSelRoom(selEq.mcc_room);}}>🗺️ موقع البريكر: {selEq.mcc_room} ← {selEq.rack} ← صف {selEq.row_position}</button>
+                  {!selEq.decommissioned&&(
+                    <div>
+                      <button className="alb" onClick={()=>{setShowApply(selEq.id);setPickedSl(nextSlot());}}>🔒 تطبيق قفل جديد على هذه المعدة</button>
+                      {eqLocks(selEq.id).map(l=>(
+                        <button key={l.lock_no} className="rlb" onClick={()=>removeLock(l.lock_no)}>🔓 إزالة {l.lock_no} ({LT[l.lock_type]?.label}) — يعود للخطاف</button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="rp">
+              <div className="pb">
+                <div className="stitle">الصندوق — سريع</div>
+                <div style={{display:"grid",gridTemplateColumns:"14px repeat(8,1fr)",gap:2,marginBottom:8}}>
+                  <div/>
+                  {BC.map(c=><div key={c} style={{textAlign:"center",fontSize:8,color:"var(--muted)",fontFamily:"monospace"}}>{c}</div>)}
+                  {BR.map(r=>(
+                    <Fragment key={r}>
+                      <div style={{fontSize:8,color:"var(--muted)",fontFamily:"monospace",display:"flex",alignItems:"center",justifyContent:"center"}}>{r}</div>
+                      {BC.map(c=>{const sl=c+r,lk=boxMap[sl],lt=lk?LT[lk.lock_type]:null;return(
+                        <div key={sl} style={{aspectRatio:"1",borderRadius:3,border:"1px solid "+(lk?lt.color+"44":"var(--b)"),background:lk?"#"+lt.hex+"22":"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,cursor:lk?"pointer":"default",boxShadow:hlSlot===sl?"0 0 0 1px var(--accent)":""}} onClick={()=>lk&&(setTab("locks"),setHlSlot(sl))}>{lk?lt.icon:""}</div>
+                      );})}
+                    </Fragment>
+                  ))}
+                </div>
+                <button className="nb" style={{fontSize:12}} onClick={()=>setTab("locks")}>عرض الصندوق الكامل 🔍</button>
+              </div>
+              <div className="pb">
+                <div className="stitle">تسلسل الإغلاق</div>
+                <div style={{marginBottom:8}}>
+                  <div style={{fontSize:10,color:"var(--danger)",fontWeight:700,marginBottom:4}}>🔒 إغلاق:</div>
+                  {[["#22C55E","1","المشغل أولاً"],["#3B82F6","2","الميكانيكا"],["#EF4444","3","الكهرباء"]].map(([c,n,l])=>(
+                    <div key={n} className="ss"><span className="sn2" style={{background:c}}>{n}</span><span style={{fontSize:11}}>{l}</span></div>
+                  ))}
+                </div>
+                <div>
+                  <div style={{fontSize:10,color:"var(--accent)",fontWeight:700,marginBottom:4}}>🔓 إزالة:</div>
+                  {[["#EF4444","1","الكهرباء أولاً"],["#3B82F6","2","الميكانيكا"],["#22C55E","3","المشغل أخيراً"]].map(([c,n,l])=>(
+                    <div key={n} className="ss"><span className="sn2" style={{background:c}}>{n}</span><span style={{fontSize:11}}>{l}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab==="locks"&&(
+        <div className="main">
+          <div className="inv3">
+            {Object.entries(LT).map(([k,v])=>(
+              <div key={k} className="ic">
+                <div style={{fontSize:11,fontWeight:700,color:v.color,marginBottom:8}}>{v.icon} {v.label}</div>
+                {[["الإجمالي",inv[k].t,"#fff"],["الخطاطيف",inv[k].v,"var(--accent)"],["الصندوق",inv[k].a,v.color]].map(([l,n,c])=>(
+                  <div key={l} className="ir"><span style={{color:"var(--muted)"}}>{l}</span><span style={{fontFamily:"monospace",fontWeight:700,color:c}}>{n}</span></div>
+                ))}
+              </div>
+            ))}
+          </div>
+          <div className="bhs">
+            <div className="bpan">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <div>
+                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>📦 الصندوق</div>
+                  <div style={{fontSize:11,color:"var(--muted)",marginTop:1}}>كل مفتاح = قفله على بريكر</div>
+                </div>
+                <div style={{textAlign:"left"}}><div style={{fontFamily:"monospace",fontSize:18,fontWeight:900,color:"var(--danger)"}}>{applied.length}</div><div style={{fontSize:10,color:"var(--muted)"}}>مطبق</div></div>
+              </div>
+              <div className="bgrid">
+                <div/>
+                {BC.map(c=><div key={c} className="bgh">{c}</div>)}
+                {BR.map(row=>(
+                  <Fragment key={row}>
+                    <div className="bgh">{row}</div>
+                    {BC.map(col=>{const sl=col+row,lk=boxMap[sl],lt=lk?LT[lk.lock_type]:null,isHl=hlSlot===sl;return(
+                      <div key={sl} className={"bsl"+(lk?" hk":"")+(isHl?" hl":"")} style={lk?{background:"#"+lt.hex+"1A",borderColor:lt.color+"55"}:{}} title={lk?lk.lock_no+" → "+(lk.equipment?.tag||""):sl} onClick={()=>setHlSlot(isHl?null:sl)}>
+                        {lk&&<><div style={{fontSize:10}}>🔑</div><div className="bno" style={{color:lt.color}}>{lk.lock_no}</div></>}
+                      </div>
+                    );})}
+                  </Fragment>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
+                {Object.entries(LT).map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--muted)"}}><div style={{width:8,height:8,borderRadius:2,background:v.color}}/>{v.label} ({inv[k].a})</div>))}
+              </div>
+              {hlSlot&&boxMap[hlSlot]&&(()=>{const lk=boxMap[hlSlot],lt=LT[lk.lock_type];return(
+                <div style={{marginTop:10,background:lt.color+"0D",border:"1px solid "+lt.color+"33",borderRadius:8,padding:"10px 12px",fontSize:11}}>
+                  <div style={{fontWeight:900,color:lt.color,fontSize:13,marginBottom:6}}>🔑 مفتاح {lk.lock_no} — خانة {hlSlot}</div>
+                  <div className="dr"><span className="dk">المعدة</span><span className="dv">{lk.equipment?.tag}</span></div>
+                  <div className="dr"><span className="dk">الموقع</span><span className="dv">{lk.equipment?.mcc_room} ← {lk.equipment?.rack} ← {lk.equipment?.row_position}</span></div>
+                  <div className="dr"><span className="dk">المنفذ</span><span className="dv">{lk.applied_by}</span></div>
+                  <div className="dr"><span className="dk">السبب</span><span className="dv" style={{fontFamily:"Tajawal,sans-serif"}}>{lk.reason}</span></div>
+                  <button className="rlb" style={{marginTop:8}} onClick={()=>{removeLock(lk.lock_no);setHlSlot(null);}}>🔓 إزالة — يعود للخطاف</button>
+                </div>
+              );})()}
+            </div>
+            <div className="hpan">
+              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+                <div><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🪝 الخطاطيف</div><div style={{fontSize:11,color:"var(--muted)",marginTop:1}}>القفل + مفتاحه جاهزان</div></div>
+                <div style={{textAlign:"left"}}><div style={{fontFamily:"monospace",fontSize:18,fontWeight:900,color:"var(--accent)"}}>{avail.length}</div><div style={{fontSize:10,color:"var(--muted)"}}>متاح</div></div>
+              </div>
+              <div className="hgrid">
+                {avail.map(l=>{const lt=LT[l.lock_type];return(
+                  <div key={l.lock_no} className="hook av" style={{borderColor:lt.color+"44",background:lt.color+"08"}}>
+                    <div className="hpeg"/><div style={{fontSize:18}}>{lt.icon}</div>
+                    <div style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:lt.color}}>{l.lock_no}</div>
+                  </div>
+                );})}
+                {applied.map(l=>(
+                  <div key={l.lock_no} className="hook em">
+                    <div className="hpeg"/><div style={{fontSize:14,opacity:.4}}>○</div>
+                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"monospace"}}>{l.lock_no}</div>
+                    <div style={{fontSize:8,color:"var(--danger)"}}>على بريكر</div>
+                  </div>
+                ))}
+                {avail.length===0&&applied.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:20,color:"var(--muted)",fontSize:12}}>اضغط "+ قفل" لإضافة الأقفال</div>}
+              </div>
+              <div style={{marginTop:10,padding:8,background:"var(--s2)",borderRadius:7,fontSize:11,color:"var(--muted)",textAlign:"center",lineHeight:1.6}}>خطاف ممتلئ = متاح جاهز<br/>خطاف فارغ = على بريكر ومفتاحه في الصندوق</div>
+            </div>
+          </div>
+          <div className="twrap">
+            <div className="th2">
+              <div className="stitle" style={{margin:0}}>جدول الأقفال المطبقة</div>
+              {isSup&&<button className="exp" onClick={exportCSV}>⬇ تصدير CSV</button>}
+            </div>
+            {applied.length===0&&<div className="empty">✅ الصندوق فارغ — لا توجد أقفال مطبقة</div>}
+            <table>
+              <thead><tr><th>📦</th><th>القفل</th><th>المعدة</th><th>الموقع</th><th>السبب</th><th>المنفذ</th><th>التاريخ</th><th></th></tr></thead>
+              <tbody>
+                {applied.map(l=>{const lt=LT[l.lock_type];return(
+                  <tr key={l.lock_no} onClick={()=>setHlSlot(hlSlot===l.box_slot?null:l.box_slot)} style={{cursor:"pointer"}}>
+                    <td style={{color:"var(--warn)",fontWeight:700}}>{l.box_slot}</td>
+                    <td style={{color:lt.color,fontWeight:700}}>{lt.icon} {l.lock_no}</td>
+                    <td style={{color:"#fff"}}>{l.equipment?.tag}</td>
+                    <td style={{fontSize:10,color:"var(--muted)"}}>{l.equipment?.mcc_room} {l.equipment?.rack} {l.equipment?.row_position}</td>
+                    <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.reason}</td>
+                    <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.applied_by}</td>
+                    <td>{l.applied_at?.slice(0,10)}</td>
+                    <td><button className="rt" onClick={ev=>{ev.stopPropagation();removeLock(l.lock_no);}}>🔓</button></td>
+                  </tr>
+                );})}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {tab==="rooms"&&(
+        <div className="main">
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
+            {Object.entries(rooms).map(([k,v])=>{
+              const re=eq.filter(e=>e.mcc_room===k),rl=re.filter(e=>eqLocks(e.id).length>0).length;
+              return(
+                <div key={k} style={{background:"var(--s1)",border:"1px solid "+(selRoom===k?"var(--accent)":"var(--b)"),borderRadius:10,padding:12,cursor:"pointer"}} onClick={()=>setSelRoom(selRoom===k?null:k)}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                    <div style={{width:9,height:9,borderRadius:"50%",background:v.color}}/>
+                    <div><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{k}</div><div style={{fontSize:10,color:"var(--muted)"}}>{v.label}</div></div>
+                  </div>
+                  <div style={{fontSize:22,fontWeight:900,fontFamily:"monospace",color:v.color}}>{rl}</div>
+                  <div style={{fontSize:10,color:"var(--muted)",marginBottom:8}}>قفل من {re.length} معدة</div>
+                  {(v.racks||[]).map(r=>{const rc=re.filter(e=>e.rack===r&&eqLocks(e.id).length>0).length;return(
+                    <div key={r} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid var(--b)",fontSize:11,fontFamily:"monospace"}}>
+                      <span>{r}</span>{rc>0&&<span style={{color:"var(--danger)",fontWeight:700}}>🔒{rc}</span>}
+                    </div>
+                  );})}
+                </div>
+              );
+            })}
+          </div>
+          {selRoom&&(
+            <div className="twrap">
+              <div className="th2"><div className="stitle" style={{margin:0}}>{rooms[selRoom]?.label}</div></div>
+              <table>
+                <thead><tr><th>المعدة</th><th>الاسم</th><th>الراك</th><th>الصف</th><th>الأقفال</th><th>الحالة</th></tr></thead>
+                <tbody>
+                  {eq.filter(e=>e.mcc_room===selRoom).map(e=>{
+                    const st=e.decommissioned?"decomm":eqSt(e.id,locks);
+                    return(
+                      <tr key={e.id}>
+                        <td style={{color:"#fff",fontWeight:700}}>{e.tag}</td>
+                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:12}}>{e.name}</td>
+                        <td style={{color:"var(--accent)"}}>{e.rack}</td>
+                        <td>{e.row_position}</td>
+                        <td>{eqLocks(e.id).map(l=>(LT[l.lock_type]?.icon||"")+l.lock_no+"(📦"+l.box_slot+")").join(" ")||"—"}</td>
+                        <td style={{color:SI[st].color,fontWeight:700}}>{SI[st].label}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {tab==="reports"&&(
+        <div className="main">
+          {!isSup&&<div className="empty" style={{padding:40}}>⭐ التقارير للمشرف فقط</div>}
+          {isSup&&(
+            <Fragment>
+              <div className="twrap">
+                <div className="th2"><div className="stitle" style={{margin:0}}>🔴 الأقفال المطبقة الآن</div><button className="exp" onClick={exportCSV}>⬇ تصدير CSV</button></div>
+                <table>
+                  <thead><tr><th>📦</th><th>القفل</th><th>المعدة</th><th>الموقع</th><th>السبب</th><th>المنفذ</th><th>التاريخ</th></tr></thead>
+                  <tbody>
+                    {applied.map(l=>{const lt=LT[l.lock_type];return(
+                      <tr key={l.lock_no}>
+                        <td style={{color:"var(--warn)",fontWeight:700}}>{l.box_slot}</td>
+                        <td style={{color:lt.color,fontWeight:700}}>{lt.icon} {l.lock_no}</td>
+                        <td style={{color:"#fff"}}>{l.equipment?.tag}</td>
+                        <td style={{fontSize:10}}>{l.equipment?.mcc_room} {l.equipment?.rack} {l.equipment?.row_position}</td>
+                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.reason}</td>
+                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.applied_by}</td>
+                        <td>{l.applied_at?.slice(0,10)}</td>
+                      </tr>
+                    );})}
+                    {applied.length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:20,color:"var(--muted)"}}>✅ لا توجد أقفال مطبقة الآن</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+              <div className="twrap">
+                <div className="th2"><div className="stitle" style={{margin:0}}>📜 سجل الأوديت</div></div>
+                {log.length===0&&<div className="empty">لا توجد أحداث بعد</div>}
+                <table>
+                  <thead><tr><th>الإجراء</th><th>القفل</th><th>المعدة</th><th>السبب</th><th>المنفذ</th><th>📦</th><th>الوقت</th></tr></thead>
+                  <tbody>
+                    {log.map(h=>(
+                      <tr key={h.id}>
+                        <td style={{color:h.action==="APPLIED"?"var(--danger)":"var(--accent)",fontWeight:700}}>{h.action==="APPLIED"?"🔒 إغلاق":h.action==="REMOVED"?"🔓 فتح":h.action==="ADDED_EQ"?"🏭 معدة":"🔑 قفل"}</td>
+                        <td style={{color:LT[h.lock_type]?.color||"var(--muted)",fontWeight:700}}>{h.lock_no||"—"}</td>
+                        <td style={{color:"#fff"}}>{h.eq_tag||"—"}</td>
+                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{h.reason||"—"}</td>
+                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{h.by_name||"—"}</td>
+                        <td style={{color:"var(--warn)"}}>{h.box_slot||"—"}</td>
+                        <td style={{fontSize:10}}>{h.action_at?.slice(0,16).replace("T"," ")}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Fragment>
+          )}
+        </div>
+      )}
+
+      {/* APPLY MODAL */}
+      {showApply&&(()=>{
+        const e=eq.find(x=>x.id===showApply);
+        return(
+          <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowApply(null);}}>
+            <div className="modal">
+              <div className="mt">🔒 تطبيق قفل</div>
+              <div className="ib">📍 <strong>{e?.tag}</strong> — {e?.mcc_room} ← {e?.rack} ← صف {e?.row_position}<br/>خذ القفل من الخطاف ← ضعه على البريكر ← ضع المفتاح في الصندوق</div>
+              <div className="fg">
+                <label className="fl">اختر القفل من الخطاطيف</label>
+                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+                  {avail.map(l=>{const lt=LT[l.lock_type];return(
+                    <span key={l.lock_no} className={"chip"+(pickedLk===l.lock_no?" pk":"")} style={{color:lt.color,borderColor:lt.color+(pickedLk===l.lock_no?"":"44"),background:lt.color+(pickedLk===l.lock_no?"22":"0D")}} onClick={()=>setPickedLk(l.lock_no)}>{lt.icon} {l.lock_no}</span>
+                  );})}
+                  {avail.length===0&&<div style={{color:"var(--danger)",fontSize:12,padding:8}}>⚠️ لا توجد أقفال متاحة — أضف أقفالاً بالضغط على "+ قفل"</div>}
+                </div>
+              </div>
+              <div className="fg">
+                <label className="fl">خانة الصندوق للمفتاح</label>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <input className="fi" style={{flex:1}} placeholder="A3" value={pickedSl} onChange={ev=>setPickedSl(ev.target.value.toUpperCase())}/>
+                  <span style={{fontSize:11,color:"var(--accent)"}}>مقترح: {nextSlot()}</span>
+                </div>
+              </div>
+              <div className="fg">
+                <label className="fl">الاسم</label>
+                <select className="fs" value={aForm.appliedBy} onChange={ev=>setAForm(p=>({...p,appliedBy:ev.target.value}))}>
+                  <option value="">اختر الموظف...</option>
+                  {staff.map(p=><option key={p.id} value={p.full_name}>{p.full_name} — {p.id_no}</option>)}
+                </select>
+              </div>
+              <div className="fg">
+                <label className="fl">سبب الإغلاق</label>
+                <select className="fs" value={aForm.reason} onChange={ev=>setAForm(p=>({...p,reason:ev.target.value}))}>
+                  {REASONS.map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div className="fg"><label className="fl">رقم التصريح</label><input className="fi" placeholder="WP-2025-" value={aForm.permit} onChange={ev=>setAForm(p=>({...p,permit:ev.target.value}))}/></div>
+              <div className="mac">
+                <button className="can" onClick={()=>setShowApply(null)}>إلغاء</button>
+                <button className="con" disabled={!pickedLk||!pickedSl||!aForm.appliedBy} onClick={()=>applyLock(showApply)}>🔒 تطبيق {pickedLk} → 📦 {pickedSl}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ADD EQ */}
+      {showAddEq&&(
+        <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowAddEq(false);}}>
+          <div className="modal">
+            <div className="mt">🏭 إضافة معدة جديدة</div>
+            <div className="two">
+              <div className="fg"><label className="fl">رقم المعدة (Tag)</label><input className="fi" placeholder="12-P-9113-M" value={eForm.tag} onChange={ev=>setEForm(p=>({...p,tag:ev.target.value}))}/></div>
+              <div className="fg"><label className="fl">رقم التصريح</label><input className="fi" placeholder="WP-2025-" value={eForm.permit} onChange={ev=>setEForm(p=>({...p,permit:ev.target.value}))}/></div>
+            </div>
+            <div className="fg"><label className="fl">اسم المعدة</label><input className="fi" placeholder="Jacket Circulation Pump..." value={eForm.name} onChange={ev=>setEForm(p=>({...p,name:ev.target.value}))}/></div>
+            <div className="two">
+              <div className="fg">
+                <label className="fl">غرفة MCC</label>
+                <select className="fs" value={eForm.mcc_room} onChange={ev=>setEForm(p=>({...p,mcc_room:ev.target.value,rack:rooms[ev.target.value]?.racks?.[0]||""}))}>
+                  {Object.keys(rooms).map(k=><option key={k} value={k}>{k}</option>)}
+                </select>
+              </div>
+              <div className="fg">
+                <label className="fl">الراك</label>
+                <select className="fs" value={eForm.rack} onChange={ev=>setEForm(p=>({...p,rack:ev.target.value}))}>
+                  {(rooms[eForm.mcc_room]?.racks||[]).map(r=><option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="fg"><label className="fl">الصف (مثل G4)</label><input className="fi" placeholder="G4" value={eForm.row_position} onChange={ev=>setEForm(p=>({...p,row_position:ev.target.value}))}/></div>
+            <div className="mac">
+              <button className="can" onClick={()=>setShowAddEq(false)}>إلغاء</button>
+              <button className="con" disabled={!eForm.tag||!eForm.name} onClick={addEq}>✅ إضافة المعدة</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD LOCK */}
+      {showAddLk&&(
+        <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowAddLk(false);}}>
+          <div className="modal">
+            <div className="mt">🔑 إضافة قفل للنظام</div>
+            <div className="ib">القفل الجديد سيظهر على الخطاطيف كـ "متاح" ✅</div>
+            <div className="two">
+              <div className="fg"><label className="fl">رقم القفل</label><input className="fi" placeholder="M101" value={lForm.lock_no} onChange={ev=>setLForm(p=>({...p,lock_no:ev.target.value.toUpperCase()}))}/></div>
+              <div className="fg">
+                <label className="fl">النوع</label>
+                <select className="fs" value={lForm.lock_type} onChange={ev=>setLForm(p=>({...p,lock_type:ev.target.value}))}>
+                  <option value="operations">🟢 مشغل</option>
+                  <option value="mechanical">🔵 ميكانيكي</option>
+                  <option value="electrical">🔴 كهربائي</option>
+                </select>
+              </div>
+            </div>
+            <div className="mac">
+              <button className="can" onClick={()=>setShowAddLk(false)}>إلغاء</button>
+              <button className="con" disabled={!lForm.lock_no} onClick={addLk}>✅ إضافة للخطاطيف</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast&&<div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
