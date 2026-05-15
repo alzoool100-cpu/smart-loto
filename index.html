@@ -1,752 +1,1567 @@
-﻿<!DOCTYPE html>
-<html dir="rtl" lang="ar">
+<!DOCTYPE html>
+<html dir="ltr" lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Smart LOTO — نظام إدارة الأقفال</title>
+<title>Smart LOTO — Lockout/Tagout Management</title>
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#07101E;font-family:'Tajawal',sans-serif;color:#E2E8F0;min-height:100vh}
 :root{--bg:#07101E;--s1:#0D1829;--s2:#122035;--s3:#1A2D47;--b:#1E3050;--accent:#00C9A7;--danger:#EF4444;--warn:#F59E0B;--muted:#64748B}
-.app{min-height:100vh;direction:rtl}
-.nav{background:linear-gradient(135deg,#060D1A,#0D1E38);border-bottom:1px solid var(--b);padding:10px 18px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:9px;margin-left:auto}
-.bi{width:38px;height:38px;border-radius:10px;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:20px}
-.bt{font-size:16px;font-weight:900;color:#fff}.bs{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace}
-.live{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.25);border-radius:20px;padding:3px 10px}
-.ld{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite;display:inline-block}
-@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
-.rbar{background:var(--s1);border-bottom:1px solid var(--b);padding:8px 18px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.rbtn{padding:5px 12px;border-radius:7px;border:1px solid var(--b);background:none;color:var(--muted);font-size:12px;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .2s}
-.rbtn.on{font-weight:800;color:#000}
-.abtn{background:var(--accent);color:#000;border:none;border-radius:8px;padding:7px 14px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:800;cursor:pointer}
-.abtn.s{background:var(--s3);color:var(--accent);border:1px solid var(--accent)}
-.tbar{background:var(--s1);border-bottom:1px solid var(--b);padding:0 18px;display:flex;overflow-x:auto}
-.tb{padding:10px 14px;border:none;background:none;color:var(--muted);font-size:12px;font-family:'Tajawal',sans-serif;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
-.tb.on{color:#fff;font-weight:800;border-bottom-color:var(--accent)}
-.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80vh;gap:16px;color:var(--muted)}
-.spin{width:44px;height:44px;border:3px solid var(--b);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+body{background:var(--bg);font-family:'Segoe UI',system-ui,sans-serif;color:#E2E8F0;min-height:100vh;direction:ltr}
+.spin{width:40px;height:40px;border:3px solid var(--b);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.errbox{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:24px;margin:30px;text-align:center;color:var(--danger)}
-.vbar{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:9px;padding:9px 14px;display:flex;align-items:center;gap:10px;margin:12px 18px 0}
-.main{padding:14px 18px;display:flex;flex-direction:column;gap:14px}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
-@media(max-width:600px){.stats{grid-template-columns:repeat(3,1fr)}.lay{grid-template-columns:1fr!important}.bhs{grid-template-columns:1fr!important}.inv3{grid-template-columns:1fr!important}}
-.stat{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px 14px;position:relative;overflow:hidden}
-.sn{font-size:24px;font-weight:900;font-family:'IBM Plex Mono',monospace}.sl{font-size:11px;color:var(--muted);margin-top:1px}
-.sb{position:absolute;bottom:0;left:0;right:0;height:3px}
-.sbar{background:var(--s1);border:1px solid var(--b);border-radius:9px;padding:9px 13px;display:flex;gap:9px;align-items:center}
-.si{flex:1;background:none;border:none;outline:none;color:#E2E8F0;font-size:14px;text-align:right;direction:rtl;font-family:'IBM Plex Mono',monospace}
-.si::placeholder{color:var(--muted)}
-.frow{display:flex;gap:6px;flex-wrap:wrap}
-.fb{padding:4px 11px;border-radius:20px;border:1px solid var(--b);background:none;color:var(--muted);font-size:11px;font-family:'Tajawal',sans-serif;cursor:pointer;transition:all .2s}
-.fb.on{font-weight:800;color:#000}
-.lay{display:grid;grid-template-columns:1fr 290px;gap:14px}
-.stitle{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
-.eql{display:flex;flex-direction:column;gap:6px}
-.eq{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px 14px;cursor:pointer;transition:all .2s}
-.eq:hover,.eq.sel{border-color:var(--accent);background:var(--s2)}
-.eq.viol{border-color:rgba(239,68,68,.4);background:rgba(239,68,68,.03)}
-.eq.dc{opacity:.6;border-style:dashed}
-.etag{font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:700;color:#fff}
-.ename{font-size:12px;color:var(--muted);margin-top:1px}
-.epath{display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap}
-.pt{background:var(--s3);border:1px solid var(--b);border-radius:4px;padding:2px 7px;font-size:10px;font-family:'IBM Plex Mono',monospace;color:var(--muted)}
-.stt{padding:2px 8px;border-radius:20px;font-size:10px;font-weight:800;border:1px solid;white-space:nowrap;margin-right:auto}
-.lrow{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap}
-.lc{display:flex;align-items:center;gap:3px;padding:3px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid;font-family:'IBM Plex Mono',monospace}
-.lo{width:13px;height:13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#000;flex-shrink:0}
-.det{background:var(--s2);border:1px solid var(--accent);border-radius:10px;padding:14px;margin-top:10px}
-.dtitle{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.dr{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--b);font-size:12px}
-.dr:last-child{border:none}.dk{color:var(--muted)}.dv{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:11px}
-.nb{width:100%;margin-top:8px;padding:8px;border-radius:8px;border:none;background:var(--s3);color:var(--accent);font-family:'Tajawal',sans-serif;font-size:13px;font-weight:700;cursor:pointer}
-.alb{padding:8px;border-radius:7px;border:1px dashed var(--accent);background:none;color:var(--accent);font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;text-align:center;margin-top:6px;width:100%}
-.rlb{padding:7px;border-radius:7px;border:1px solid var(--danger);background:none;color:var(--danger);font-family:'Tajawal',sans-serif;font-size:12px;cursor:pointer;margin-top:4px;width:100%}
-.rlb:hover{background:rgba(239,68,68,.1)}
-.rp{display:flex;flex-direction:column;gap:10px}
-.pb{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px}
-.bhs{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.bpan,.hpan{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:14px}
-.bgrid{display:grid;grid-template-columns:18px repeat(8,1fr);gap:2px}
-.bgh{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--muted);display:flex;align-items:center;justify-content:center;height:18px}
-.bsl{aspect-ratio:1;border-radius:4px;border:1px solid var(--b);background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;cursor:pointer;transition:all .15s}
-.bsl.hk:hover{transform:scale(1.08);z-index:2}.bsl.hl{box-shadow:0 0 0 2px var(--accent);transform:scale(1.1);z-index:3}
-.bno{font-family:'IBM Plex Mono',monospace;font-size:7px;font-weight:700;line-height:1}
-.hgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
-.hook{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:8px;border:1px solid var(--b);background:var(--bg);min-height:62px;transition:all .2s}
-.hook.av{cursor:pointer}.hook.av:hover{border-color:var(--accent)}.hook.em{opacity:.3;border-style:dashed}
-.hpeg{width:2px;height:10px;background:var(--muted);border-radius:2px;opacity:.6}
-.inv3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.ic{background:var(--s1);border:1px solid var(--b);border-radius:10px;padding:12px}
-.ir{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;border-bottom:1px solid var(--b)}.ir:last-child{border:none}
-.twrap{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:14px}
-.th2{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:6px}
-table{width:100%;border-collapse:collapse;font-size:11px;overflow-x:auto;display:block}
-th{background:var(--s3);padding:7px 10px;text-align:right;color:var(--muted);font-weight:700;border-bottom:1px solid var(--b);white-space:nowrap}
-td{padding:7px 10px;border-bottom:1px solid var(--b);font-family:'IBM Plex Mono',monospace;white-space:nowrap}
-tr:last-child td{border:none}tr:hover td{background:var(--s2)}
-.rt{background:none;border:1px solid var(--danger);color:var(--danger);border-radius:5px;padding:3px 8px;font-size:10px;font-family:'Tajawal',sans-serif;cursor:pointer}
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:300;display:flex;align-items:center;justify-content:center;padding:14px}
-.modal{background:var(--s1);border:1px solid var(--b);border-radius:14px;padding:18px;width:100%;max-width:440px;max-height:92vh;overflow-y:auto;direction:rtl}
-.mt{font-size:15px;font-weight:900;margin-bottom:14px}
-.fg{margin-bottom:10px}.fl{font-size:11px;color:var(--muted);margin-bottom:4px;display:block}
-.fi,.fs{width:100%;background:var(--bg);border:1px solid var(--b);border-radius:7px;padding:8px 11px;color:#E2E8F0;font-family:'IBM Plex Mono',monospace;font-size:13px;outline:none;direction:rtl;text-align:right}
-.fi:focus,.fs:focus{border-color:var(--accent)}.fs option{background:var(--s1)}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.mac{display:flex;gap:8px;margin-top:14px}
-.can{flex:1;background:none;border:1px solid var(--b);color:var(--muted);border-radius:8px;padding:8px;font-family:'Tajawal',sans-serif;font-size:13px;cursor:pointer}
-.con{flex:2;background:var(--accent);color:#000;border:none;border-radius:8px;padding:8px;font-family:'Tajawal',sans-serif;font-size:13px;font-weight:800;cursor:pointer}
-.con:disabled{opacity:.35;cursor:not-allowed}
-.ib{background:rgba(0,201,167,.06);border:1px solid rgba(0,201,167,.2);border-radius:8px;padding:10px;font-size:12px;color:var(--accent);margin-bottom:12px;line-height:1.7}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:7px;border:1px solid;font-size:12px;font-family:'IBM Plex Mono',monospace;cursor:pointer;margin:3px;transition:all .2s}
-.chip.pk{box-shadow:0 0 0 2px var(--accent)}
-.empty{text-align:center;padding:28px;color:var(--muted);font-size:13px}
-.ss{display:flex;align-items:center;gap:8px;padding:4px 0;font-size:12px}
-.sn2{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:#000;flex-shrink:0}
-.exp{background:var(--s3);color:#E2E8F0;border:1px solid var(--b);border-radius:6px;padding:5px 12px;font-size:11px;font-family:'Tajawal',sans-serif;cursor:pointer}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--accent);color:#000;padding:10px 24px;border-radius:20px;font-weight:800;font-size:13px;z-index:999;white-space:nowrap;animation:fup .3s ease}
-@keyframes fup{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.2}}
+@keyframes fadein{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.toast-wrap{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{padding:10px 22px;border-radius:9px;font-size:13px;font-weight:600;animation:fadein .3s;box-shadow:0 4px 20px rgba(0,0,0,.4)}
+.toast.ok{background:#166534;color:#86efac;border:1px solid #22c55e}
+.toast.err{background:#7f1d1d;color:#fca5a5;border:1px solid var(--danger)}
+.toast.warn{background:#78350f;color:#fcd34d;border:1px solid var(--warn)}
+nav{background:linear-gradient(135deg,#060D1A,#0D1E38);border-bottom:1px solid var(--b);padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-icon{width:36px;height:36px;background:var(--accent);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#000}
+.brand-text{font-size:16px;font-weight:800;color:#fff}
+.brand-sub{font-size:10px;color:var(--muted);font-family:monospace}
+.live-pill{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--accent);background:rgba(0,201,167,.08);border:1px solid rgba(0,201,167,.2);border-radius:20px;padding:3px 10px}
+.live-dot{width:5px;height:5px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.user-pill{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:20px;padding:5px 12px;font-size:12px}
+.role-badge{font-size:10px;padding:2px 7px;border-radius:10px;font-weight:700;text-transform:uppercase}
+.role-supervisor{background:#7c3aed;color:#ddd6fe}
+.role-operations{background:#166534;color:#86efac}
+.role-mechanical{background:#1e40af;color:#bfdbfe}
+.role-electrical{background:#7f1d1d;color:#fca5a5}
+.tabs{background:var(--s1);border-bottom:1px solid var(--b);padding:0 20px;display:flex;overflow-x:auto;gap:2px}
+.tab{padding:10px 16px;border:none;background:none;color:var(--muted);font-size:13px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+.tab.on{color:#fff;font-weight:700;border-bottom-color:var(--accent)}
+.tab:hover:not(.on){color:#94a3b8}
+.main{padding:16px 20px;display:flex;flex-direction:column;gap:16px}
+.card{background:var(--s1);border:1px solid var(--b);border-radius:12px;padding:16px}
+.card-title{font-size:13px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;margin-bottom:12px}
+.stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+@media(max-width:900px){.stats-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:500px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{background:var(--s1);border:1px solid var(--b);border-radius:11px;padding:14px;position:relative;overflow:hidden}
+.stat-num{font-size:28px;font-weight:900;font-family:monospace}
+.stat-label{font-size:11px;color:var(--muted);margin-top:2px}
+.stat-bar{position:absolute;bottom:0;left:0;right:0;height:3px}
+.search-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.search-box{display:flex;align-items:center;gap:8px;background:var(--s2);border:1px solid var(--b);border-radius:8px;padding:8px 12px}
+.search-box input{flex:1;background:none;border:none;outline:none;color:#E2E8F0;font-size:13px;min-width:150px}
+.search-box input::placeholder{color:var(--muted)}
+select,input[type=text],input[type=password],input[type=date],textarea{background:var(--s2);border:1px solid var(--b);border-radius:7px;color:#E2E8F0;padding:8px 11px;font-size:13px;outline:none;transition:border-color .2s}
+select:focus,input:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--s1)}
+.btn{padding:8px 16px;border-radius:8px;border:none;font-size:13px;font-weight:600;cursor:pointer;transition:all .2s}
+.btn-accent{background:var(--accent);color:#000}
+.btn-accent:hover{background:#00b396}
+.btn-danger{background:var(--danger);color:#fff}
+.btn-danger:hover{background:#dc2626}
+.btn-ghost{background:var(--s3);color:#E2E8F0;border:1px solid var(--b)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-warn{background:var(--warn);color:#000}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:9px 12px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;border-bottom:1px solid var(--b);background:var(--s2)}
+td{padding:9px 12px;border-bottom:1px solid rgba(30,48,80,.6)}
+tr:hover td{background:rgba(255,255,255,.02)}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:700}
+.badge-green{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.badge-blue{background:rgba(59,130,246,.15);color:#3b82f6;border:1px solid rgba(59,130,246,.3)}
+.badge-red{background:rgba(239,68,68,.15);color:#ef4444;border:1px solid rgba(239,68,68,.3)}
+.badge-gray{background:rgba(100,116,139,.15);color:#94a3b8;border:1px solid rgba(100,116,139,.3)}
+.badge-amber{background:rgba(245,158,11,.15);color:#f59e0b;border:1px solid rgba(245,158,11,.3)}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px}
+.modal{background:var(--s1);border:1px solid var(--b);border-radius:14px;width:100%;max-width:540px;max-height:90vh;overflow-y:auto;animation:fadein .2s}
+.modal-header{padding:18px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:16px;font-weight:800}
+.modal-body{padding:18px 20px}
+.modal-footer{padding:0 20px 18px;display:flex;gap:8px;justify-content:flex-end}
+.close-btn{background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
+.close-btn:hover{color:#E2E8F0}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-label{font-size:12px;color:var(--muted);font-weight:600}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.alert{padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:10px}
+.alert-danger{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
+.alert-warn{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);color:#fcd34d}
+.alert-ok{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac}
+.box-grid{display:grid;grid-template-columns:repeat(8,1fr);gap:6px;margin-top:10px}
+.box-slot{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1px solid var(--b);background:var(--s2);transition:all .2s;position:relative;min-height:50px}
+.box-slot-label{font-size:9px;color:var(--muted);position:absolute;top:3px;left:0;right:0;text-align:center}
+.hooks-board{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.hook{width:48px;height:56px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;background:var(--s2)}
+.hook.ops{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:#22c55e}
+.hook.mech{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.4);color:#3b82f6}
+.hook.elec{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.4);color:#ef4444}
+.eq-card{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:13px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s}
+.eq-card:hover{border-color:rgba(0,201,167,.3)}
+.eq-tag{font-family:monospace;font-size:13px;font-weight:700;color:var(--accent)}
+.eq-name{font-size:14px;font-weight:600}
+.eq-loc{font-size:11px;color:var(--muted);font-family:monospace}
+.eq-locks{display:flex;gap:6px;flex-wrap:wrap}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.seq-alert{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.4);border-radius:9px;padding:10px 14px;font-size:12px;color:#fcd34d;display:flex;align-items:center;gap:8px}
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--b);border-radius:8px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.ac-item{padding:8px 12px;cursor:pointer;font-size:13px;font-family:monospace;transition:background .15s}
+.ac-item:hover{background:var(--s3)}
+.login-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg);padding:20px}
+.login-card{background:var(--s1);border:1px solid var(--b);border-radius:16px;padding:36px 32px;width:100%;max-width:380px;animation:fadein .3s}
+.login-brand{text-align:center;margin-bottom:28px}
+.login-icon{width:56px;height:56px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:#000;margin:0 auto 12px}
+.login-title{font-size:22px;font-weight:900;color:#fff}
+.login-sub{font-size:12px;color:var(--muted);margin-top:4px}
+.mcc-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media(max-width:700px){.mcc-grid{grid-template-columns:1fr}}
+.mcc-card{background:var(--s2);border:1px solid var(--b);border-radius:11px;padding:14px}
+.rack-item{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid rgba(30,48,80,.5);font-size:12px}
+.rack-item:last-child{border-bottom:none}
+.detail-panel{background:var(--s2);border:1px solid var(--b);border-radius:12px;padding:16px}
+.detail-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(30,48,80,.5);font-size:13px;gap:8px}
+.detail-row:last-child{border-bottom:none}
+.detail-label{color:var(--muted);font-size:12px;flex-shrink:0}
+.two-col{display:grid;grid-template-columns:1fr 340px;gap:16px}
+@media(max-width:900px){.two-col{grid-template-columns:1fr}}
+.emp-list{display:flex;flex-direction:column;gap:6px}
+.emp-item{background:var(--s2);border:1px solid var(--b);border-radius:9px;padding:11px 14px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:border-color .2s}
+.emp-item:hover,.emp-item.on{border-color:var(--accent)}
+.emp-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;background:var(--s3);color:var(--accent);flex-shrink:0}
+.filter-row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end}
+.empty{text-align:center;padding:40px;color:var(--muted);font-size:13px}
+.loading-center{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:14px;color:var(--muted)}
+.tag-print-btn{background:#7c3aed;color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer}
+.tag-print-btn:hover{background:#6d28d9}
+.ovr-x{overflow-x:auto}
+@media print{
+  body>*:not(#danger-tag){display:none!important}
+  #danger-tag{display:block!important;position:fixed;top:0;left:0;width:80mm;background:#fff;color:#000;font-family:'Courier New',monospace;padding:4mm}
+}
+#danger-tag{display:none}
 </style>
 </head>
 <body>
 <div id="root"></div>
+<div id="danger-tag"></div>
+
 <script type="text/babel" data-presets="react" charset="utf-8">
-const { useState, useEffect, useCallback, Fragment } = React;
+const { useState, useEffect, useCallback, useRef, Fragment } = React;
 const { createClient } = supabase;
 
-const SUPABASE_URL = "https://nbgmfvzrfylmhzwjwewl.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZ21mdnpyZnlsbWh6d2p3ZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2OTIyODMsImV4cCI6MjA5NDI2ODI4M30.Ir8-Ot9xib5wulL1uV2S8HKl1lTB1Ou8wlpuJe-tixg";
+const SUPA_URL = 'https://nbgmfvzrfylmhzwjwewl.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5iZ21mdnpyZnlsbWh6d2p3ZXdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2OTIyODMsImV4cCI6MjA5NDI2ODI4M30.Ir8-Ot9xib5wulL1uV2S8HKl1lTB1Ou8wlpuJe-tixg';
+const db = createClient(SUPA_URL, SUPA_KEY);
 
-const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+const REASONS = ['Routine Maintenance','Coupling Replacement','Bearing Replacement','Seal Replacement','Inspection','Electrical Work','Valve Maintenance','Motor Replacement','Decommissioned','Other'];
 
-const LT = {
-  operations:{label:"مشغل",color:"#22C55E",icon:"🟢",hex:"22C55E"},
-  mechanical:{label:"ميكانيكي",color:"#3B82F6",icon:"🔵",hex:"3B82F6"},
-  electrical:{label:"كهربائي",color:"#EF4444",icon:"🔴",hex:"EF4444"}
+const MCC_ROOMS = {
+  '60K-A':  { plant:'60K',    racks:['SA.10','SA.12','SA.14','SA.16'], color:'#22c55e' },
+  '60K-B':  { plant:'60K',    racks:['SA.18','SA.20','SA.22'],         color:'#86efac' },
+  '120K-A': { plant:'120K',   racks:['SA.30','SA.32','SA.34'],         color:'#3b82f6' },
+  '120K-B': { plant:'120K',   racks:['SA.36','SA.38'],                 color:'#60a5fa' },
+  'UTIL':   { plant:'Utility',racks:['SA.50','SA.52'],                  color:'#f59e0b' },
 };
-const RI = {
-  supervisor:{label:"مشرف",icon:"⭐",color:"#F59E0B"},
-  operations:{label:"مشغل",icon:"🟢",color:"#22C55E"},
-  mechanical:{label:"ميكانيكا",icon:"🔵",color:"#3B82F6"},
-  electrical:{label:"كهرباء",icon:"🔴",color:"#EF4444"}
-};
-const REASONS = ["صيانة روتينية","استبدال كابلنج","استبدال بيرينج","استبدال ختم / سيل","فحص ومعاينة","أعمال كهربائية","صيانة صمام","استبدال موتور","معدة ملغاة","أخرى"];
-const BC=["A","B","C","D","E","F","G","H"],BR=[1,2,3,4,5,6,7,8];
-const SLOTS=BC.flatMap(c=>BR.map(r=>`${c}${r}`));
 
-function eqSt(id,locks){
-  const al=locks.filter(l=>l.status==="applied"&&l.equipment_id===id);
-  const op=al.some(l=>l.lock_type==="operations");
-  const mn=al.some(l=>l.lock_type!=="operations");
-  if(!op&&mn)return"violation";if(op&&mn)return"locked_safe";if(op)return"ops_only";return"clear";
+// ── SHA-256 ──────────────────────────────────────────────────────────────────
+async function sha256(msg) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
 }
-const SI={
-  violation:{label:"🚨 خطأ تسلسل",color:"#EF4444",bg:"rgba(239,68,68,.12)"},
-  locked_safe:{label:"🔒 مغلق صحيح",color:"#22C55E",bg:"rgba(34,197,94,.1)"},
-  ops_only:{label:"⏳ بانتظار صيانة",color:"#F59E0B",bg:"rgba(245,158,11,.1)"},
-  clear:{label:"✅ متاحة",color:"#64748B",bg:"rgba(100,116,139,.07)"},
-  decomm:{label:"⚠️ ملغاة",color:"#64748B",bg:"rgba(100,116,139,.07)"}
-};
 
-function App() {
-  const [role,setRole]=useState("supervisor");
-  const [tab,setTab]=useState("dashboard");
-  const [loading,setLoading]=useState(true);
-  const [error,setError]=useState(null);
-  const [toast,setToast]=useState(null);
-  const [eq,setEq]=useState([]);
-  const [locks,setLocks]=useState([]);
-  const [staff,setStaff]=useState([]);
-  const [rooms,setRooms]=useState({});
-  const [log,setLog]=useState([]);
-  const [search,setSearch]=useState("");
-  const [roomF,setRoomF]=useState("all");
-  const [sel,setSel]=useState(null);
-  const [hlSlot,setHlSlot]=useState(null);
-  const [selRoom,setSelRoom]=useState(null);
-  const [showApply,setShowApply]=useState(null);
-  const [showAddEq,setShowAddEq]=useState(false);
-  const [showAddLk,setShowAddLk]=useState(false);
-  const [pickedLk,setPickedLk]=useState("");
-  const [pickedSl,setPickedSl]=useState("");
-  const [aForm,setAForm]=useState({appliedBy:"",idNo:"",reason:"صيانة روتينية",permit:""});
-  const [eForm,setEForm]=useState({tag:"",name:"",mcc_room:"60K-A",rack:"SA.14",row_position:"",permit:""});
-  const [lForm,setLForm]=useState({lock_no:"",lock_type:"operations"});
+// ── TOAST SYSTEM ─────────────────────────────────────────────────────────────
+let _setToasts = null;
+function toast(msg, type = 'ok') {
+  if (_setToasts) _setToasts(ts => [...ts, { id: Date.now() + Math.random(), msg, type }]);
+}
 
-  function showT(m){setToast(m);setTimeout(()=>setToast(null),2800);}
-
-  const load=useCallback(async()=>{
-    try{
-      setError(null);
-      const [eRes,lRes,sRes,rRes,lgRes]=await Promise.all([
-        db.from("equipment").select("*").order("tag"),
-        db.from("locks").select("*,equipment:equipment_id(tag,name,mcc_room,rack,row_position)").order("lock_no"),
-        db.from("personnel").select("*").eq("active",true).order("full_name"),
-        db.from("mcc_rooms").select("*").order("code"),
-        db.from("audit_log").select("*").order("action_at",{ascending:false}).limit(100),
-      ]);
-      if(eRes.error)throw eRes.error;
-      if(lRes.error)throw lRes.error;
-      setEq(eRes.data||[]);setLocks(lRes.data||[]);setStaff(sRes.data||[]);
-      const rm={};(rRes.data||[]).forEach(x=>{rm[x.code]=x;});setRooms(rm);
-      setLog(lgRes.data||[]);
-    }catch(err){setError(err.message||"خطأ في الاتصال");}
-    finally{setLoading(false);}
-  },[]);
-
-  useEffect(()=>{load();},[]);
-  useEffect(()=>{const t=setInterval(load,30000);return()=>clearInterval(t);},[]);
-
-  const applied=locks.filter(l=>l.status==="applied");
-  const avail=locks.filter(l=>l.status==="available");
-  const eqLocks=id=>locks.filter(l=>l.status==="applied"&&l.equipment_id===id);
-  const violations=eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="violation");
-  const boxMap={};applied.forEach(l=>{if(l.box_slot)boxMap[l.box_slot]=l;});
-  function nextSlot(){const u=new Set(applied.map(l=>l.box_slot).filter(Boolean));return SLOTS.find(s=>!u.has(s))||"";}
-  const inv={
-    operations:{t:locks.filter(l=>l.lock_type==="operations").length,a:applied.filter(l=>l.lock_type==="operations").length,v:avail.filter(l=>l.lock_type==="operations").length},
-    mechanical:{t:locks.filter(l=>l.lock_type==="mechanical").length,a:applied.filter(l=>l.lock_type==="mechanical").length,v:avail.filter(l=>l.lock_type==="mechanical").length},
-    electrical:{t:locks.filter(l=>l.lock_type==="electrical").length,a:applied.filter(l=>l.lock_type==="electrical").length,v:avail.filter(l=>l.lock_type==="electrical").length}
-  };
-  const vis=eq.filter(e=>{
-    if(roomF!=="all"&&e.mcc_room!==roomF)return false;
-    if(search.trim()){const q=search.trim().toUpperCase();return e.tag.toUpperCase().includes(q)||e.name.toUpperCase().includes(q)||eqLocks(e.id).some(l=>l.lock_no.toUpperCase().includes(q));}
-    return true;
-  });
-
-  async function applyLock(eqId){
-    const e=eq.find(x=>x.id===eqId);
-    const {error:e1}=await db.from("locks").update({status:"applied",equipment_id:eqId,box_slot:pickedSl,applied_by:aForm.appliedBy,applied_id_no:aForm.idNo,reason:aForm.reason,permit:aForm.permit,applied_at:new Date().toISOString()}).eq("lock_no",pickedLk);
-    if(e1){alert("خطأ: "+e1.message);return;}
-    await db.from("audit_log").insert({action:"APPLIED",lock_no:pickedLk,lock_type:locks.find(l=>l.lock_no===pickedLk)?.lock_type,eq_tag:e?.tag,eq_name:e?.name,by_name:aForm.appliedBy,by_id_no:aForm.idNo,reason:aForm.reason,box_slot:pickedSl});
-    await load();setShowApply(null);setPickedLk("");setPickedSl("");setAForm({appliedBy:"",idNo:"",reason:"صيانة روتينية",permit:""});
-    showT("✅ تم تطبيق القفل "+pickedLk+" — المفتاح في خانة "+pickedSl);
-  }
-
-  async function removeLock(lockNo){
-    const lk=locks.find(l=>l.lock_no===lockNo);
-    const e=eq.find(x=>x.id===lk?.equipment_id);
-    const {error:e1}=await db.from("locks").update({status:"available",equipment_id:null,box_slot:null,applied_by:null,applied_id_no:null,reason:null,permit:null,applied_at:null}).eq("lock_no",lockNo);
-    if(e1){alert("خطأ: "+e1.message);return;}
-    await db.from("audit_log").insert({action:"REMOVED",lock_no:lockNo,lock_type:lk?.lock_type,eq_tag:e?.tag,by_name:lk?.applied_by,reason:lk?.reason,box_slot:lk?.box_slot});
-    await load();setHlSlot(null);setSel(null);showT("🔓 تم إزالة القفل "+lockNo);
-  }
-
-  async function addEq(){
-    const {error:e1}=await db.from("equipment").insert(eForm);
-    if(e1){alert("خطأ: "+e1.message);return;}
-    await db.from("audit_log").insert({action:"ADDED_EQ",eq_tag:eForm.tag,eq_name:eForm.name});
-    await load();setShowAddEq(false);setEForm({tag:"",name:"",mcc_room:"60K-A",rack:"SA.14",row_position:"",permit:""});showT("✅ تمت إضافة المعدة");
-  }
-
-  async function addLk(){
-    const {error:e1}=await db.from("locks").insert({lock_no:lForm.lock_no,lock_type:lForm.lock_type,status:"available"});
-    if(e1){alert("خطأ: "+e1.message);return;}
-    await db.from("audit_log").insert({action:"ADDED_LOCK",lock_no:lForm.lock_no,lock_type:lForm.lock_type});
-    await load();setShowAddLk(false);setLForm({lock_no:"",lock_type:"operations"});showT("✅ تمت إضافة القفل "+lForm.lock_no);
-  }
-
-  function exportCSV(){
-    const rows=[["📦","القفل","النوع","المعدة","الغرفة","الراك","الصف","السبب","المنفذ","التاريخ"],...applied.map(l=>[l.box_slot,l.lock_no,l.lock_type,l.equipment?.tag,l.equipment?.mcc_room,l.equipment?.rack,l.equipment?.row_position,l.reason,l.applied_by,l.applied_at?.slice(0,10)])];
-    const a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\uFEFF"+rows.map(r=>r.join(",")).join("\n")],{type:"text/csv"}));a.download="SmartLOTO_"+(new Date().toISOString().slice(0,10))+".csv";a.click();
-  }
-
-  const selEq=sel?eq.find(e=>e.id===sel):null;
-  const selSt=selEq?(selEq.decommissioned?"decomm":eqSt(selEq.id,locks)):null;
-  const isSup=role==="supervisor";
-
-  if(loading)return(
-    <div className="loading">
-      <div className="spin"/>
-      <div style={{color:"var(--accent)",fontSize:14}}>جارٍ تحميل Smart LOTO...</div>
-      <div style={{fontSize:11,color:"var(--muted)"}}>الاتصال بـ Supabase</div>
+function Toasts() {
+  const [toasts, setToasts] = useState([]);
+  _setToasts = setToasts;
+  useEffect(() => {
+    if (!toasts.length) return;
+    const t = setTimeout(() => setToasts(ts => ts.slice(1)), 3000);
+    return () => clearTimeout(t);
+  }, [toasts]);
+  return (
+    <div className="toast-wrap">
+      {toasts.map(t => <div key={t.id} className={`toast ${t.type}`}>{t.msg}</div>)}
     </div>
   );
+}
 
-  if(error)return(
-    <div className="errbox">
-      <div style={{fontSize:32,marginBottom:8}}>⚠️</div>
-      <div style={{fontWeight:700,fontSize:16,marginBottom:8}}>خطأ في الاتصال</div>
-      <div style={{fontSize:12,opacity:.8,marginBottom:16,wordBreak:"break-all"}}>{error}</div>
-      <button onClick={()=>{setLoading(true);load();}} style={{padding:"10px 24px",borderRadius:8,border:"none",background:"var(--danger)",color:"#fff",cursor:"pointer",fontFamily:"Tajawal",fontSize:14,fontWeight:700}}>🔄 إعادة المحاولة</button>
+// ── HELPERS ──────────────────────────────────────────────────────────────────
+function lockColor(type) {
+  if (type === 'operations') return '#22c55e';
+  if (type === 'mechanical') return '#3b82f6';
+  if (type === 'electrical') return '#ef4444';
+  return '#94a3b8';
+}
+function lockBadgeClass(type) {
+  if (type === 'operations') return 'badge-green';
+  if (type === 'mechanical') return 'badge-blue';
+  if (type === 'electrical') return 'badge-red';
+  return 'badge-gray';
+}
+function roleLockType(role) {
+  if (role === 'operations') return 'operations';
+  if (role === 'mechanical') return 'mechanical';
+  if (role === 'electrical') return 'electrical';
+  return null;
+}
+
+// ── PRINT DANGER TAG ─────────────────────────────────────────────────────────
+function printDangerTag(info) {
+  const now = new Date();
+  const time = now.toTimeString().slice(0, 5);
+  const date = now.toLocaleDateString('en-GB');
+  const el = document.getElementById('danger-tag');
+  el.innerHTML = `<div style="width:72mm;font-family:'Courier New',monospace;font-size:10pt;border:3px solid #000;padding:3mm;background:#fff;color:#000">
+    <div style="text-align:center;background:#000;color:#fff;font-weight:900;font-size:14pt;letter-spacing:.1em;padding:5px;margin-bottom:5px">&#9608;&#9608; DANGER &#9608;&#9608;</div>
+    <div style="text-align:center;font-weight:900;font-size:9pt;margin-bottom:6px;border-bottom:2px solid #000;padding-bottom:3px">DO NOT REMOVE THIS TAG</div>
+    <table style="width:100%;font-size:9pt;border-collapse:collapse">
+      <tr><td style="font-weight:700;width:38%;padding:2px 0">Remarks:</td><td style="border-bottom:1px solid #aaa">&nbsp;</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Equip. No:</td><td>${info.eq_tag||''}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Lock No:</td><td>${info.lock_no||''}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Time:</td><td>${time}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Date:</td><td>${date}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Work Permit:</td><td>${info.permit||'—'}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">I.D. No:</td><td>${info.id_no||''}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Name:</td><td>${info.full_name||''}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Company:</td><td>${info.company||''}</td></tr>
+      <tr><td style="font-weight:700;padding:2px 0">Signature:</td><td style="border-bottom:1px solid #aaa">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
+    </table>
+  </div>`;
+  el.style.display = 'block';
+  setTimeout(() => { window.print(); el.style.display = 'none'; el.innerHTML = ''; }, 150);
+}
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+function Modal({ title, onClose, children, footer }) {
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-header">
+          <div className="modal-title">{title}</div>
+          <button className="close-btn" onClick={onClose}>×</button>
+        </div>
+        <div className="modal-body">{children}</div>
+        {footer && <div className="modal-footer">{footer}</div>}
+      </div>
     </div>
   );
+}
+
+// ── AUTOCOMPLETE LOCK PICKER ──────────────────────────────────────────────────
+function LockPicker({ lockType, onSelect, selected }) {
+  const [query, setQuery] = useState('');
+  const [locks, setLocks] = useState([]);
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    db.from('locks').select('*').eq('lock_type', lockType).eq('status', 'available').order('lock_no')
+      .then(({ data }) => setLocks(data || []));
+  }, [lockType]);
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const display = selected ? selected.lock_no : query;
+  const filtered = locks.filter(l => l.lock_no.toLowerCase().includes(query.toLowerCase()));
 
   return (
-    <div className="app">
-      <div className="nav">
-        <div className="live"><span className="ld"/>مباشر ✅</div>
-        {violations.length>0&&<span style={{fontSize:12,color:"var(--danger)",fontWeight:700}}>🚨 {violations.length} انتهاك</span>}
-        <div className="brand">
-          <div className="bi">🔒</div>
-          <div><div className="bt">Smart LOTO</div><div className="bs">LOCKOUT/TAGOUT MANAGEMENT</div></div>
-        </div>
-      </div>
-
-      <div className="rbar">
-        <span style={{fontSize:11,color:"var(--muted)"}}>الدخول كـ:</span>
-        {Object.entries(RI).map(([k,v])=>(
-          <button key={k} className={"rbtn"+(role===k?" on":"")} style={role===k?{background:v.color,borderColor:v.color}:{}} onClick={()=>setRole(k)}>{v.icon} {v.label}</button>
-        ))}
-        {isSup&&<div style={{display:"flex",gap:6,marginRight:"auto"}}>
-          <button className="abtn" onClick={()=>setShowAddEq(true)}>+ معدة</button>
-          <button className="abtn s" onClick={()=>setShowAddLk(true)}>+ قفل</button>
-          <button className="abtn s" onClick={()=>{setLoading(true);load();}}>🔄</button>
-        </div>}
-      </div>
-
-      <div className="tbar">
-        {[["dashboard","📊 لوحة التحكم"],["locks","🔑 الأقفال"],["rooms","🏭 غرف MCC"],["reports","📋 تقارير"]].map(([k,v])=>(
-          <button key={k} className={"tb"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{v}</button>
-        ))}
-      </div>
-
-      {violations.length>0&&tab==="dashboard"&&(
-        <div className="vbar">
-          <span style={{fontSize:20}}>🚨</span>
-          <div>
-            <div style={{fontWeight:700,color:"var(--danger)",fontSize:13}}>انتهاك تسلسل! {violations.length} معدة عليها قفل صيانة بدون قفل مشغل</div>
-            <div style={{fontSize:11,color:"rgba(239,68,68,.7)",marginTop:2}}>{violations.map(v=>v.tag).join(" · ")}</div>
-          </div>
+    <div className="ac-wrap" ref={ref}>
+      <input type="text" style={{ width: '100%' }}
+        placeholder={`Search ${lockType} lock...`}
+        value={display}
+        onChange={e => { setQuery(e.target.value); setOpen(true); if (selected) onSelect(null); }}
+        onFocus={() => setOpen(true)}
+      />
+      {open && (
+        <div className="ac-list">
+          {filtered.length === 0
+            ? <div className="ac-item" style={{ color: 'var(--muted)' }}>No available locks</div>
+            : filtered.map(l => (
+              <div key={l.id} className="ac-item" onMouseDown={() => { onSelect(l); setQuery(''); setOpen(false); }}>
+                <span style={{ color: lockColor(l.lock_type), fontWeight: 700 }}>{l.lock_no}</span>
+                {l.box_slot && <span style={{ color: 'var(--muted)', marginLeft: 8, fontSize: 11 }}>Slot {l.box_slot}</span>}
+              </div>
+            ))
+          }
         </div>
       )}
+    </div>
+  );
+}
 
-      {tab==="dashboard"&&(
-        <div className="main">
-          <div className="stats">
-            {[["#EF4444",violations.length,"🚨 انتهاك"],["#22C55E",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="locked_safe").length,"🔒 مغلق صحيح"],["#F59E0B",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="ops_only").length,"⏳ بانتظار"],["var(--accent)",eq.filter(e=>!e.decommissioned&&eqSt(e.id,locks)==="clear").length,"✅ متاحة"],["var(--muted)",applied.length,"🔑 مطبقة"]].map(([c,n,l])=>(
-              <div key={l} className="stat"><div className="sn" style={{color:c}}>{n}</div><div className="sl">{l}</div><div className="sb" style={{background:c}}/></div>
-            ))}
-          </div>
-          <div className="sbar"><span>🔍</span><input className="si" placeholder="ابحث برقم المعدة أو القفل..." value={search} onChange={e=>setSearch(e.target.value)}/></div>
-          <div className="frow">
-            <button className={"fb"+(roomF==="all"?" on":"")} style={roomF==="all"?{background:"var(--accent)",borderColor:"var(--accent)"}:{}} onClick={()=>setRoomF("all")}>الكل</button>
-            {Object.entries(rooms).map(([k,v])=>(
-              <button key={k} className={"fb"+(roomF===k?" on":"")} style={roomF===k?{background:v.color,borderColor:v.color}:{}} onClick={()=>setRoomF(k)}>{k}</button>
-            ))}
-          </div>
-          <div className="lay">
-            <div>
-              <div className="stitle">المعدات ({vis.length})</div>
-              {eq.length===0&&<div className="empty"><div style={{fontSize:40,marginBottom:8}}>🏭</div><div style={{fontWeight:700}}>لا توجد معدات بعد</div><div style={{fontSize:11,marginTop:6,color:"var(--muted)"}}>اضغط "+ معدة" لإضافة أول معدة</div></div>}
-              <div className="eql">
-                {vis.map(e=>{
-                  const st=e.decommissioned?"decomm":eqSt(e.id,locks),si=SI[st],el=eqLocks(e.id),rm=rooms[e.mcc_room];
-                  return(
-                    <div key={e.id} className={"eq"+(sel===e.id?" sel":"")+(st==="violation"?" viol":"")+(e.decommissioned?" dc":"")} onClick={()=>setSel(sel===e.id?null:e.id)}>
-                      <div style={{display:"flex",alignItems:"flex-start",gap:10}}>
-                        <div style={{flex:1}}>
-                          <div className="etag">{e.tag}</div>
-                          <div className="ename">{e.name}</div>
-                          <div className="epath">
-                            <span className="pt" style={{color:rm?.color||"var(--muted)"}}>{e.mcc_room}</span>
-                            <span style={{color:"var(--muted)",fontSize:10}}>›</span>
-                            <span className="pt">{e.rack}</span>
-                            <span style={{color:"var(--muted)",fontSize:10}}>›</span>
-                            <span className="pt">صف {e.row_position}</span>
-                          </div>
-                        </div>
-                        <span className="stt" style={{color:si.color,borderColor:si.color+"55",background:si.bg}}>{si.label}</span>
-                      </div>
-                      <div className="lrow">
-                        {el.length===0&&<span style={{fontSize:10,color:"var(--muted)"}}>لا توجد أقفال</span>}
-                        {el.map((l,i)=>{const lt=LT[l.lock_type];return(
-                          <span key={l.lock_no} className="lc" style={{color:lt.color,borderColor:lt.color+"44",background:lt.color+"11"}}>
-                            <span className="lo" style={{background:lt.color}}>{i+1}</span>
-                            {lt.icon}{l.lock_no}
-                            <span style={{fontSize:9,color:"var(--muted)"}}>📦{l.box_slot}</span>
-                          </span>
-                        );})}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              {selEq&&(
-                <div className="det">
-                  <div className="dtitle">{SI[selSt].label} <span style={{fontFamily:"monospace",fontSize:13,color:"#fff"}}>{selEq.tag}</span></div>
-                  {[["الاسم",selEq.name],["الغرفة",rooms[selEq.mcc_room]?.label||selEq.mcc_room],["الراك",selEq.rack],["الصف",selEq.row_position],["التصريح",selEq.permit||"—"]].map(([k,v])=>(
-                    <div key={k} className="dr"><span className="dk">{k}</span><span className="dv">{v}</span></div>
-                  ))}
-                  {eqLocks(selEq.id).length>0&&(
-                    <div style={{marginTop:10,borderTop:"1px solid var(--b)",paddingTop:10}}>
-                      <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontWeight:700}}>الأقفال المطبقة:</div>
-                      {eqLocks(selEq.id).map((l,i)=>{const lt=LT[l.lock_type];return(
-                        <div key={l.lock_no} style={{background:lt.color+"0D",border:"1px solid "+lt.color+"33",borderRadius:7,padding:"7px 10px",marginBottom:5,fontSize:11}}>
-                          <div style={{display:"flex",justifyContent:"space-between"}}>
-                            <span style={{color:lt.color,fontWeight:900}}>{i+1}. {lt.icon} {l.lock_no} — {lt.label}</span>
-                            <span style={{color:"var(--warn)",fontFamily:"monospace",fontWeight:700}}>📦 {l.box_slot}</span>
-                          </div>
-                          <div style={{color:"var(--muted)",marginTop:2}}>{l.applied_by} · {l.reason}</div>
-                        </div>
-                      );})}
-                    </div>
-                  )}
-                  <button className="nb" onClick={()=>{setTab("rooms");setSelRoom(selEq.mcc_room);}}>🗺️ موقع البريكر: {selEq.mcc_room} ← {selEq.rack} ← صف {selEq.row_position}</button>
-                  {!selEq.decommissioned&&(
-                    <div>
-                      <button className="alb" onClick={()=>{setShowApply(selEq.id);setPickedSl(nextSlot());}}>🔒 تطبيق قفل جديد على هذه المعدة</button>
-                      {eqLocks(selEq.id).map(l=>(
-                        <button key={l.lock_no} className="rlb" onClick={()=>removeLock(l.lock_no)}>🔓 إزالة {l.lock_no} ({LT[l.lock_type]?.label}) — يعود للخطاف</button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="rp">
-              <div className="pb">
-                <div className="stitle">الصندوق — سريع</div>
-                <div style={{display:"grid",gridTemplateColumns:"14px repeat(8,1fr)",gap:2,marginBottom:8}}>
-                  <div/>
-                  {BC.map(c=><div key={c} style={{textAlign:"center",fontSize:8,color:"var(--muted)",fontFamily:"monospace"}}>{c}</div>)}
-                  {BR.map(r=>(
-                    <Fragment key={r}>
-                      <div style={{fontSize:8,color:"var(--muted)",fontFamily:"monospace",display:"flex",alignItems:"center",justifyContent:"center"}}>{r}</div>
-                      {BC.map(c=>{const sl=c+r,lk=boxMap[sl],lt=lk?LT[lk.lock_type]:null;return(
-                        <div key={sl} style={{aspectRatio:"1",borderRadius:3,border:"1px solid "+(lk?lt.color+"44":"var(--b)"),background:lk?"#"+lt.hex+"22":"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:7,cursor:lk?"pointer":"default",boxShadow:hlSlot===sl?"0 0 0 1px var(--accent)":""}} onClick={()=>lk&&(setTab("locks"),setHlSlot(sl))}>{lk?lt.icon:""}</div>
-                      );})}
-                    </Fragment>
-                  ))}
-                </div>
-                <button className="nb" style={{fontSize:12}} onClick={()=>setTab("locks")}>عرض الصندوق الكامل 🔍</button>
-              </div>
-              <div className="pb">
-                <div className="stitle">تسلسل الإغلاق</div>
-                <div style={{marginBottom:8}}>
-                  <div style={{fontSize:10,color:"var(--danger)",fontWeight:700,marginBottom:4}}>🔒 إغلاق:</div>
-                  {[["#22C55E","1","المشغل أولاً"],["#3B82F6","2","الميكانيكا"],["#EF4444","3","الكهرباء"]].map(([c,n,l])=>(
-                    <div key={n} className="ss"><span className="sn2" style={{background:c}}>{n}</span><span style={{fontSize:11}}>{l}</span></div>
-                  ))}
-                </div>
-                <div>
-                  <div style={{fontSize:10,color:"var(--accent)",fontWeight:700,marginBottom:4}}>🔓 إزالة:</div>
-                  {[["#EF4444","1","الكهرباء أولاً"],["#3B82F6","2","الميكانيكا"],["#22C55E","3","المشغل أخيراً"]].map(([c,n,l])=>(
-                    <div key={n} className="ss"><span className="sn2" style={{background:c}}>{n}</span><span style={{fontSize:11}}>{l}</span></div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+// ── APPLY LOCK MODAL ──────────────────────────────────────────────────────────
+function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }) {
+  const [lock, setLock] = useState(null);
+  const [reason, setReason] = useState('Routine Maintenance');
+  const [otherReason, setOtherReason] = useState('');
+  const [permit, setPermit] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleApply = async () => {
+    if (!lock) { setErr('Please select a lock.'); return; }
+    setErr(''); setLoading(true);
+    // One lock per type per equipment
+    const { data: existing } = await db.from('locks').select('id')
+      .eq('equipment_id', eq.id).eq('lock_type', lockType).eq('status', 'applied');
+    if (existing && existing.length > 0) {
+      setErr(`This equipment already has a ${lockType} lock applied.`);
+      setLoading(false); return;
+    }
+    // Mechanical/electrical require ops lock
+    if (lockType !== 'operations') {
+      const { data: opsLocks } = await db.from('locks').select('id')
+        .eq('equipment_id', eq.id).eq('lock_type', 'operations').eq('status', 'applied');
+      if (!opsLocks || opsLocks.length === 0) {
+        setErr('Cannot apply: No operations lock on this equipment. Operations must lock out first.');
+        setLoading(false); return;
+      }
+    }
+    const finalReason = reason === 'Other' ? (otherReason || 'Other') : reason;
+    const now = new Date().toISOString();
+    const { error } = await db.from('locks').update({
+      status: 'applied', equipment_id: eq.id,
+      applied_by: session.full_name, applied_id_no: session.id_no,
+      reason: finalReason, permit, applied_at: now
+    }).eq('id', lock.id);
+    if (error) { setErr('Failed: ' + error.message); setLoading(false); return; }
+    await db.from('audit_log').insert({
+      action: 'APPLIED', lock_no: lock.lock_no, lock_type: lockType,
+      eq_tag: eq.tag, eq_name: eq.name,
+      by_name: session.full_name, by_id_no: session.id_no,
+      reason: finalReason, box_slot: lock.box_slot, action_at: now
+    });
+    toast(`Lock ${lock.lock_no} applied to ${eq.tag}`);
+    onApplied({ lock_no: lock.lock_no, eq_tag: eq.tag, id_no: session.id_no, full_name: session.full_name, company: session.company, permit });
+    setLoading(false);
+  };
+
+  return (
+    <Modal title={`Apply ${lockType} Lock — ${eq.tag}`} onClose={onClose}
+      footer={<>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-accent" onClick={handleApply} disabled={loading}>{loading ? 'Applying...' : 'Apply Lock'}</button>
+      </>}>
+      {err && <div className="alert alert-danger">{err}</div>}
+      <div className="form-group">
+        <label className="form-label">Select {lockType} lock</label>
+        <LockPicker lockType={lockType} onSelect={setLock} selected={lock} />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Reason</label>
+        <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: '100%' }}>
+          {REASONS.map(r => <option key={r}>{r}</option>)}
+        </select>
+      </div>
+      {reason === 'Other' && (
+        <div className="form-group">
+          <label className="form-label">Specify reason</label>
+          <input type="text" value={otherReason} onChange={e => setOtherReason(e.target.value)} style={{ width: '100%' }} />
         </div>
       )}
+      <div className="form-group">
+        <label className="form-label">Work Permit No. (optional)</label>
+        <input type="text" value={permit} onChange={e => setPermit(e.target.value)} style={{ width: '100%' }} placeholder="e.g. WP-2024-001" />
+      </div>
+    </Modal>
+  );
+}
 
-      {tab==="locks"&&(
-        <div className="main">
-          <div className="inv3">
-            {Object.entries(LT).map(([k,v])=>(
-              <div key={k} className="ic">
-                <div style={{fontSize:11,fontWeight:700,color:v.color,marginBottom:8}}>{v.icon} {v.label}</div>
-                {[["الإجمالي",inv[k].t,"#fff"],["الخطاطيف",inv[k].v,"var(--accent)"],["الصندوق",inv[k].a,v.color]].map(([l,n,c])=>(
-                  <div key={l} className="ir"><span style={{color:"var(--muted)"}}>{l}</span><span style={{fontFamily:"monospace",fontWeight:700,color:c}}>{n}</span></div>
-                ))}
-              </div>
-            ))}
+// ── REMOVE LOCK MODAL ─────────────────────────────────────────────────────────
+function RemoveLockModal({ lock, equipment: eq, session, onClose, onRemoved }) {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const handleRemove = async () => {
+    setLoading(true);
+    if (lock.lock_type === 'operations') {
+      const { data: others } = await db.from('locks').select('id')
+        .eq('equipment_id', eq.id).in('lock_type', ['mechanical', 'electrical']).eq('status', 'applied');
+      if (others && others.length > 0) {
+        setErr('Cannot remove operations lock: mechanical or electrical locks are still applied.');
+        setLoading(false); return;
+      }
+    }
+    const { error } = await db.from('locks').update({
+      status: 'available', equipment_id: null, applied_by: null,
+      applied_id_no: null, reason: null, permit: null, applied_at: null
+    }).eq('id', lock.id);
+    if (error) { setErr('Failed: ' + error.message); setLoading(false); return; }
+    await db.from('audit_log').insert({
+      action: 'REMOVED', lock_no: lock.lock_no, lock_type: lock.lock_type,
+      eq_tag: eq.tag, eq_name: eq.name,
+      by_name: session.full_name, by_id_no: session.id_no,
+      reason: lock.reason, box_slot: lock.box_slot,
+      action_at: new Date().toISOString()
+    });
+    toast(`Lock ${lock.lock_no} removed from ${eq.tag}`);
+    onRemoved();
+  };
+
+  return (
+    <Modal title={`Remove ${lock.lock_type} Lock`} onClose={onClose}
+      footer={<>
+        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+        <button className="btn btn-danger" onClick={handleRemove} disabled={loading}>{loading ? 'Removing...' : 'Remove Lock'}</button>
+      </>}>
+      {err && <div className="alert alert-danger">{err}</div>}
+      <p style={{ fontSize: 13, marginBottom: 12 }}>
+        Remove lock <strong style={{ color: lockColor(lock.lock_type) }}>{lock.lock_no}</strong> from <strong>{eq.tag} — {eq.name}</strong>?
+      </p>
+      <div className="detail-panel" style={{ fontSize: 12 }}>
+        <div className="detail-row"><span className="detail-label">Applied By</span><span>{lock.applied_by}</span></div>
+        <div className="detail-row"><span className="detail-label">Reason</span><span>{lock.reason}</span></div>
+        <div className="detail-row"><span className="detail-label">Work Permit</span><span>{lock.permit || '—'}</span></div>
+      </div>
+    </Modal>
+  );
+}
+
+// ── EQUIPMENT CARD ────────────────────────────────────────────────────────────
+function EquipmentCard({ eq, locks, session, onAction }) {
+  const role = session.role;
+  const myLockType = roleLockType(role);
+  const opsLocks  = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'operations'  && l.status === 'applied');
+  const mechLocks = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'mechanical'  && l.status === 'applied');
+  const elecLocks = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'electrical'  && l.status === 'applied');
+  const myLocks   = myLockType ? locks.filter(l => l.equipment_id === eq.id && l.lock_type === myLockType && l.status === 'applied' && l.applied_id_no === session.id_no) : [];
+  const hasMyLock = myLocks.length > 0;
+
+  return (
+    <div className="eq-card">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div>
+          <div className="eq-tag">{eq.tag}</div>
+          <div className="eq-name">{eq.name}</div>
+          <div className="eq-loc">{eq.plant} → {eq.mcc_room} → {eq.rack} → {eq.row_position} → {eq.breaker_no || '—'}</div>
+        </div>
+        {eq.decommissioned && <span className="badge badge-gray">Decommissioned</span>}
+      </div>
+      <div className="eq-locks">
+        {opsLocks.length > 0 && <span className="badge badge-green">OPS: {opsLocks[0].lock_no}</span>}
+        {mechLocks.length > 0 && role !== 'operations' && role !== 'electrical' && <span className="badge badge-blue">MECH: {mechLocks[0].lock_no}</span>}
+        {elecLocks.length > 0 && role !== 'operations' && role !== 'mechanical' && <span className="badge badge-red">ELEC: {elecLocks[0].lock_no}</span>}
+        {opsLocks.length === 0 && mechLocks.length === 0 && elecLocks.length === 0 && <span className="badge badge-gray">No Locks</span>}
+      </div>
+      {myLockType && !eq.decommissioned && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {!hasMyLock && (
+            <button className="btn btn-sm btn-accent" onClick={() => onAction('apply', eq)}>
+              Apply {myLockType} Lock
+            </button>
+          )}
+          {hasMyLock && <>
+            <button className="btn btn-sm btn-danger" onClick={() => onAction('remove', eq, myLocks[0])}>
+              Remove My Lock ({myLocks[0].lock_no})
+            </button>
+            <button className="tag-print-btn btn-sm" onClick={() => printDangerTag({ eq_tag: eq.tag, lock_no: myLocks[0].lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: myLocks[0].permit })}>
+              🖨 Print Tag
+            </button>
+          </>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SEARCH EQUIPMENT TAB ──────────────────────────────────────────────────────
+function SearchEquipmentTab({ session, equipment, locks, onRefresh }) {
+  const [q, setQ] = useState('');
+  const [applyModal, setApplyModal] = useState(null);
+  const [removeModal, setRemoveModal] = useState(null);
+  const [lastApplied, setLastApplied] = useState(null);
+
+  const results = q.trim()
+    ? equipment.filter(e => e.tag.toLowerCase().includes(q.toLowerCase()) || e.name.toLowerCase().includes(q.toLowerCase()))
+    : [];
+
+  return (
+    <div className="main">
+      {lastApplied && (
+        <div className="alert alert-ok" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <span>Lock <strong>{lastApplied.lock_no}</strong> applied to <strong>{lastApplied.eq_tag}</strong></span>
+          <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>
+        </div>
+      )}
+      <div className="card">
+        <div className="card-title">Search Equipment</div>
+        <div className="search-row" style={{ marginBottom: 12 }}>
+          <div className="search-box" style={{ flex: 1 }}>
+            <span style={{ color: 'var(--muted)' }}>🔍</span>
+            <input type="text" placeholder="Search by tag or name..." value={q} onChange={e => setQ(e.target.value)} />
           </div>
-          <div className="bhs">
-            <div className="bpan">
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+        </div>
+        {q.trim() === '' && <div className="empty">Enter a tag or name to search</div>}
+        {q.trim() !== '' && results.length === 0 && <div className="empty">No results for "{q}"</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {results.map(eq => (
+            <EquipmentCard key={eq.id} eq={eq} locks={locks} session={session}
+              onAction={(type, eq, lock) => type === 'apply' ? setApplyModal(eq) : setRemoveModal({ eq, lock })} />
+          ))}
+        </div>
+      </div>
+      {applyModal && (
+        <ApplyLockModal equipment={applyModal} session={session} lockType={roleLockType(session.role)}
+          onClose={() => setApplyModal(null)}
+          onApplied={info => { setLastApplied(info); setApplyModal(null); onRefresh(); }} />
+      )}
+      {removeModal && (
+        <RemoveLockModal lock={removeModal.lock} equipment={removeModal.eq} session={session}
+          onClose={() => setRemoveModal(null)}
+          onRemoved={() => { setRemoveModal(null); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── OPS: MY LOCKS TAB ─────────────────────────────────────────────────────────
+function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
+  const myLocks = locks.filter(l => l.applied_id_no === session.id_no && l.lock_type === 'operations' && l.status === 'applied');
+  const [removeModal, setRemoveModal] = useState(null);
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="card-title">My Applied Locks ({myLocks.length})</div>
+        <div className="card-title" style={{ marginTop: 12, marginBottom: 6, fontSize: 11 }}>Hooks Board — Operations</div>
+        <div className="hooks-board">
+          {locks.filter(l => l.lock_type === 'operations').map(l => (
+            <div key={l.id} className={`hook ops`} style={{ opacity: l.status === 'available' ? .5 : 1 }}>
+              <span style={{ fontSize: 8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
+              <span style={{ fontSize: 9 }}>{l.lock_no}</span>
+              {l.box_slot && <span style={{ fontSize: 7, color: 'var(--muted)' }}>{l.box_slot}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        {myLocks.length === 0 && <div className="empty">No active locks applied.</div>}
+        {myLocks.map(l => {
+          const eq = equipment.find(e => e.id === l.equipment_id);
+          return (
+            <div key={l.id} style={{ background: 'var(--s2)', border: '1px solid var(--b)', borderRadius: 9, padding: 13, marginBottom: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
                 <div>
-                  <div style={{fontSize:13,fontWeight:800,color:"#fff"}}>📦 الصندوق</div>
-                  <div style={{fontSize:11,color:"var(--muted)",marginTop:1}}>كل مفتاح = قفله على بريكر</div>
-                </div>
-                <div style={{textAlign:"left"}}><div style={{fontFamily:"monospace",fontSize:18,fontWeight:900,color:"var(--danger)"}}>{applied.length}</div><div style={{fontSize:10,color:"var(--muted)"}}>مطبق</div></div>
-              </div>
-              <div className="bgrid">
-                <div/>
-                {BC.map(c=><div key={c} className="bgh">{c}</div>)}
-                {BR.map(row=>(
-                  <Fragment key={row}>
-                    <div className="bgh">{row}</div>
-                    {BC.map(col=>{const sl=col+row,lk=boxMap[sl],lt=lk?LT[lk.lock_type]:null,isHl=hlSlot===sl;return(
-                      <div key={sl} className={"bsl"+(lk?" hk":"")+(isHl?" hl":"")} style={lk?{background:"#"+lt.hex+"1A",borderColor:lt.color+"55"}:{}} title={lk?lk.lock_no+" → "+(lk.equipment?.tag||""):sl} onClick={()=>setHlSlot(isHl?null:sl)}>
-                        {lk&&<><div style={{fontSize:10}}>🔑</div><div className="bno" style={{color:lt.color}}>{lk.lock_no}</div></>}
-                      </div>
-                    );})}
-                  </Fragment>
-                ))}
-              </div>
-              <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:8}}>
-                {Object.entries(LT).map(([k,v])=>(<div key={k} style={{display:"flex",alignItems:"center",gap:4,fontSize:10,color:"var(--muted)"}}><div style={{width:8,height:8,borderRadius:2,background:v.color}}/>{v.label} ({inv[k].a})</div>))}
-              </div>
-              {hlSlot&&boxMap[hlSlot]&&(()=>{const lk=boxMap[hlSlot],lt=LT[lk.lock_type];return(
-                <div style={{marginTop:10,background:lt.color+"0D",border:"1px solid "+lt.color+"33",borderRadius:8,padding:"10px 12px",fontSize:11}}>
-                  <div style={{fontWeight:900,color:lt.color,fontSize:13,marginBottom:6}}>🔑 مفتاح {lk.lock_no} — خانة {hlSlot}</div>
-                  <div className="dr"><span className="dk">المعدة</span><span className="dv">{lk.equipment?.tag}</span></div>
-                  <div className="dr"><span className="dk">الموقع</span><span className="dv">{lk.equipment?.mcc_room} ← {lk.equipment?.rack} ← {lk.equipment?.row_position}</span></div>
-                  <div className="dr"><span className="dk">المنفذ</span><span className="dv">{lk.applied_by}</span></div>
-                  <div className="dr"><span className="dk">السبب</span><span className="dv" style={{fontFamily:"Tajawal,sans-serif"}}>{lk.reason}</span></div>
-                  <button className="rlb" style={{marginTop:8}} onClick={()=>{removeLock(lk.lock_no);setHlSlot(null);}}>🔓 إزالة — يعود للخطاف</button>
-                </div>
-              );})()}
-            </div>
-            <div className="hpan">
-              <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
-                <div><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>🪝 الخطاطيف</div><div style={{fontSize:11,color:"var(--muted)",marginTop:1}}>القفل + مفتاحه جاهزان</div></div>
-                <div style={{textAlign:"left"}}><div style={{fontFamily:"monospace",fontSize:18,fontWeight:900,color:"var(--accent)"}}>{avail.length}</div><div style={{fontSize:10,color:"var(--muted)"}}>متاح</div></div>
-              </div>
-              <div className="hgrid">
-                {avail.map(l=>{const lt=LT[l.lock_type];return(
-                  <div key={l.lock_no} className="hook av" style={{borderColor:lt.color+"44",background:lt.color+"08"}}>
-                    <div className="hpeg"/><div style={{fontSize:18}}>{lt.icon}</div>
-                    <div style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:lt.color}}>{l.lock_no}</div>
+                  <span className="badge badge-green" style={{ marginRight: 8 }}>{l.lock_no}</span>
+                  {eq && <span style={{ fontWeight: 700 }}>{eq.tag} — {eq.name}</span>}
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                    Reason: {l.reason} | Permit: {l.permit || '—'} | Applied: {l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}
                   </div>
-                );})}
-                {applied.map(l=>(
-                  <div key={l.lock_no} className="hook em">
-                    <div className="hpeg"/><div style={{fontSize:14,opacity:.4}}>○</div>
-                    <div style={{fontSize:9,color:"var(--muted)",fontFamily:"monospace"}}>{l.lock_no}</div>
-                    <div style={{fontSize:8,color:"var(--danger)"}}>على بريكر</div>
-                  </div>
-                ))}
-                {avail.length===0&&applied.length===0&&<div style={{gridColumn:"1/-1",textAlign:"center",padding:20,color:"var(--muted)",fontSize:12}}>اضغط "+ قفل" لإضافة الأقفال</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit })}>
+                    🖨 Tag
+                  </button>
+                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                </div>
               </div>
-              <div style={{marginTop:10,padding:8,background:"var(--s2)",borderRadius:7,fontSize:11,color:"var(--muted)",textAlign:"center",lineHeight:1.6}}>خطاف ممتلئ = متاح جاهز<br/>خطاف فارغ = على بريكر ومفتاحه في الصندوق</div>
             </div>
+          );
+        })}
+      </div>
+      {removeModal && (
+        <RemoveLockModal lock={removeModal.lock} equipment={removeModal.eq} session={session}
+          onClose={() => setRemoveModal(null)}
+          onRemoved={() => { setRemoveModal(null); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── MECH/ELEC: SMART LIST TAB ─────────────────────────────────────────────────
+function SmartListTab({ session, equipment, locks, onRefresh }) {
+  const myLockType = roleLockType(session.role);
+  const [applyModal, setApplyModal] = useState(null);
+  const [removeModal, setRemoveModal] = useState(null);
+  const [lastApplied, setLastApplied] = useState(null);
+
+  const smartList = equipment.filter(eq => {
+    const hasOps = locks.some(l => l.equipment_id === eq.id && l.lock_type === 'operations' && l.status === 'applied');
+    const hasMyType = locks.some(l => l.equipment_id === eq.id && l.lock_type === myLockType && l.status === 'applied');
+    return hasOps && !hasMyType && !eq.decommissioned;
+  }).sort((a, b) => {
+    const aOps = locks.find(l => l.equipment_id === a.id && l.lock_type === 'operations' && l.status === 'applied');
+    const bOps = locks.find(l => l.equipment_id === b.id && l.lock_type === 'operations' && l.status === 'applied');
+    return new Date(bOps?.applied_at || 0) - new Date(aOps?.applied_at || 0);
+  });
+
+  const myApplied = locks.filter(l => l.lock_type === myLockType && l.status === 'applied' && l.applied_id_no === session.id_no);
+
+  const bClass = myLockType === 'mechanical' ? 'badge-blue' : 'badge-red';
+
+  return (
+    <div className="main">
+      {lastApplied && (
+        <div className="alert alert-ok" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+          <span>Lock <strong>{lastApplied.lock_no}</strong> applied to <strong>{lastApplied.eq_tag}</strong></span>
+          <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>
+        </div>
+      )}
+      <div className="card">
+        <div className="card-title">Smart List — Ready for {myLockType} lockout ({smartList.length})</div>
+        {smartList.length === 0 && <div className="empty">No equipment awaiting {myLockType} lockout.</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {smartList.map(eq => {
+            const opsLock = locks.find(l => l.equipment_id === eq.id && l.lock_type === 'operations' && l.status === 'applied');
+            return (
+              <div key={eq.id} className="eq-card">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <div className="eq-tag">{eq.tag}</div>
+                    <div className="eq-name">{eq.name}</div>
+                    <div className="eq-loc">{eq.plant} → {eq.mcc_room} → {eq.rack} → {eq.row_position} → {eq.breaker_no || '—'}</div>
+                    {opsLock && <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 4 }}>
+                      Ops lock: <span style={{ color: '#22c55e' }}>{opsLock.lock_no}</span> by {opsLock.applied_by} — {opsLock.reason}
+                    </div>}
+                  </div>
+                  <button className="btn btn-sm btn-accent" onClick={() => setApplyModal(eq)}>Apply {myLockType} Lock</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      {myApplied.length > 0 && (
+        <div className="card">
+          <div className="card-title">My Applied Locks ({myApplied.length})</div>
+          {myApplied.map(l => {
+            const eq = equipment.find(e => e.id === l.equipment_id);
+            return (
+              <div key={l.id} style={{ background: 'var(--s2)', border: '1px solid var(--b)', borderRadius: 9, padding: 12, marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <span className={`badge ${bClass}`} style={{ marginRight: 8 }}>{l.lock_no}</span>
+                  {eq && <span style={{ fontWeight: 700 }}>{eq.tag} — {eq.name}</span>}
+                  <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>Reason: {l.reason} | At: {l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit })}>
+                    🖨 Tag
+                  </button>
+                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {applyModal && (
+        <ApplyLockModal equipment={applyModal} session={session} lockType={myLockType}
+          onClose={() => setApplyModal(null)}
+          onApplied={info => { setLastApplied(info); setApplyModal(null); onRefresh(); }} />
+      )}
+      {removeModal && (
+        <RemoveLockModal lock={removeModal.lock} equipment={removeModal.eq} session={session}
+          onClose={() => setRemoveModal(null)}
+          onRemoved={() => { setRemoveModal(null); onRefresh(); }} />
+      )}
+    </div>
+  );
+}
+
+// ── SUPERVISOR: DASHBOARD ─────────────────────────────────────────────────────
+function SuperDashboard({ equipment, locks, session }) {
+  const [q, setQ] = useState('');
+  const [roomFilter, setRoomFilter] = useState('all');
+
+  const opsLocked  = locks.filter(l => l.lock_type === 'operations'  && l.status === 'applied').length;
+  const mechLocked = locks.filter(l => l.lock_type === 'mechanical'  && l.status === 'applied').length;
+  const elecLocked = locks.filter(l => l.lock_type === 'electrical'  && l.status === 'applied').length;
+
+  const violations = equipment.filter(eq => {
+    const hasMech = locks.some(l => l.equipment_id === eq.id && l.lock_type === 'mechanical'  && l.status === 'applied');
+    const hasElec = locks.some(l => l.equipment_id === eq.id && l.lock_type === 'electrical'  && l.status === 'applied');
+    const hasOps  = locks.some(l => l.equipment_id === eq.id && l.lock_type === 'operations'  && l.status === 'applied');
+    return (hasMech || hasElec) && !hasOps;
+  });
+
+  const rooms = ['all', ...Object.keys(MCC_ROOMS)];
+  const filtered = equipment.filter(e => {
+    const mq = !q || e.tag.toLowerCase().includes(q.toLowerCase()) || e.name.toLowerCase().includes(q.toLowerCase());
+    const mr = roomFilter === 'all' || e.mcc_room === roomFilter;
+    return mq && mr;
+  });
+
+  return (
+    <div className="main">
+      {violations.length > 0 && (
+        <div className="seq-alert">
+          <span>⚠</span>
+          <span><strong>Sequence Violation:</strong> {violations.length} equipment has mech/elec lock but NO ops lock: {violations.map(v => v.tag).join(', ')}</span>
+        </div>
+      )}
+      <div className="stats-grid">
+        {[
+          { num: equipment.length,                          label: 'Total Equipment',   color: '#94a3b8' },
+          { num: equipment.filter(e => !e.decommissioned).length, label: 'Active Equipment', color: 'var(--accent)' },
+          { num: opsLocked,  label: 'Operations Locks', color: '#22c55e' },
+          { num: mechLocked, label: 'Mechanical Locks', color: '#3b82f6' },
+          { num: elecLocked, label: 'Electrical Locks', color: '#ef4444' },
+        ].map((s, i) => (
+          <div key={i} className="stat-card">
+            <div className="stat-num" style={{ color: s.color }}>{s.num}</div>
+            <div className="stat-label">{s.label}</div>
+            <div className="stat-bar" style={{ background: s.color, opacity: .3 }} />
           </div>
-          <div className="twrap">
-            <div className="th2">
-              <div className="stitle" style={{margin:0}}>جدول الأقفال المطبقة</div>
-              {isSup&&<button className="exp" onClick={exportCSV}>⬇ تصدير CSV</button>}
+        ))}
+      </div>
+      <div className="card">
+        <div className="section-header">
+          <div className="card-title" style={{ margin: 0 }}>Equipment Overview</div>
+        </div>
+        <div className="search-row" style={{ marginBottom: 12 }}>
+          <div className="search-box" style={{ flex: 1 }}>
+            <span style={{ color: 'var(--muted)' }}>🔍</span>
+            <input type="text" placeholder="Search equipment..." value={q} onChange={e => setQ(e.target.value)} />
+          </div>
+          <select value={roomFilter} onChange={e => setRoomFilter(e.target.value)}>
+            {rooms.map(r => <option key={r} value={r}>{r === 'all' ? 'All Rooms' : r}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 10 }}>
+          {filtered.map(eq => {
+            const opsL  = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'operations'  && l.status === 'applied');
+            const mechL = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'mechanical'  && l.status === 'applied');
+            const elecL = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'electrical'  && l.status === 'applied');
+            return (
+              <div key={eq.id} className="eq-card">
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                  <div>
+                    <div className="eq-tag">{eq.tag}</div>
+                    <div className="eq-name">{eq.name}</div>
+                    <div className="eq-loc">{eq.plant} → {eq.mcc_room} → {eq.rack} → {eq.row_position} → {eq.breaker_no || '—'}</div>
+                  </div>
+                  {eq.decommissioned && <span className="badge badge-gray">Decomm.</span>}
+                </div>
+                <div className="eq-locks">
+                  {opsL.length > 0  && <span className="badge badge-green">OPS: {opsL[0].lock_no}</span>}
+                  {mechL.length > 0 && <span className="badge badge-blue">MECH: {mechL[0].lock_no}</span>}
+                  {elecL.length > 0 && <span className="badge badge-red">ELEC: {elecL[0].lock_no}</span>}
+                  {!opsL.length && !mechL.length && !elecL.length && <span className="badge badge-gray">No Locks</span>}
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && <div className="empty" style={{ gridColumn: '1/-1' }}>No equipment found.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SUPERVISOR: EQUIPMENT TAB ─────────────────────────────────────────────────
+function SuperEquipment({ equipment, onRefresh }) {
+  const [q, setQ] = useState('');
+  const [showModal, setShowModal] = useState(false);
+  const [editEq, setEditEq] = useState(null);
+  const [form, setForm] = useState({ tag:'', name:'', mcc_room:'60K-A', rack:'', row_position:'', plant:'60K', breaker_no:'', permit:'', notes:'' });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+
+  const filtered = equipment.filter(e => !q || e.tag.toLowerCase().includes(q.toLowerCase()) || e.name.toLowerCase().includes(q.toLowerCase()));
+
+  const openAdd = () => { setForm({ tag:'', name:'', mcc_room:'60K-A', rack:'', row_position:'', plant:'60K', breaker_no:'', permit:'', notes:'' }); setEditEq(null); setErr(''); setShowModal(true); };
+  const openEdit = eq => { setForm({ tag:eq.tag, name:eq.name, mcc_room:eq.mcc_room||'', rack:eq.rack||'', row_position:eq.row_position||'', plant:eq.plant||'', breaker_no:eq.breaker_no||'', permit:eq.permit||'', notes:eq.notes||'' }); setEditEq(eq); setErr(''); setShowModal(true); };
+
+  const handleSave = async () => {
+    if (!form.tag || !form.name) { setErr('Tag and name required.'); return; }
+    setLoading(true);
+    if (editEq) {
+      const { error } = await db.from('equipment').update({ ...form }).eq('id', editEq.id);
+      if (error) { setErr(error.message); setLoading(false); return; }
+      toast('Equipment updated');
+    } else {
+      const { error } = await db.from('equipment').insert({ ...form, decommissioned: false });
+      if (error) { setErr(error.message); setLoading(false); return; }
+      toast('Equipment added');
+    }
+    setShowModal(false); onRefresh(); setLoading(false);
+  };
+
+  const toggleDecommission = async eq => {
+    await db.from('equipment').update({ decommissioned: !eq.decommissioned }).eq('id', eq.id);
+    toast(eq.decommissioned ? 'Equipment reactivated' : 'Equipment decommissioned');
+    onRefresh();
+  };
+
+  const setMccRoom = val => setForm(f => ({ ...f, mcc_room: val, plant: MCC_ROOMS[val]?.plant || f.plant }));
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="section-header">
+          <div className="card-title" style={{ margin: 0 }}>Equipment ({equipment.length})</div>
+          <button className="btn btn-accent" onClick={openAdd}>+ Add Equipment</button>
+        </div>
+        <div className="search-row" style={{ marginBottom: 12 }}>
+          <div className="search-box" style={{ flex: 1 }}>
+            <span style={{ color: 'var(--muted)' }}>🔍</span>
+            <input type="text" placeholder="Search equipment..." value={q} onChange={e => setQ(e.target.value)} />
+          </div>
+        </div>
+        <div className="ovr-x">
+          <table>
+            <thead><tr><th>Tag</th><th>Name</th><th>Plant</th><th>MCC Room</th><th>Rack</th><th>Row</th><th>Breaker</th><th>Status</th><th>Actions</th></tr></thead>
+            <tbody>
+              {filtered.map(eq => (
+                <tr key={eq.id}>
+                  <td><span className="eq-tag">{eq.tag}</span></td>
+                  <td>{eq.name}</td>
+                  <td>{eq.plant}</td>
+                  <td>{eq.mcc_room}</td>
+                  <td>{eq.rack}</td>
+                  <td>{eq.row_position}</td>
+                  <td>{eq.breaker_no || '—'}</td>
+                  <td>{eq.decommissioned ? <span className="badge badge-gray">Decomm.</span> : <span className="badge badge-green">Active</span>}</td>
+                  <td>
+                    <div style={{ display: 'flex', gap: 5 }}>
+                      <button className="btn btn-ghost btn-sm" onClick={() => openEdit(eq)}>Edit</button>
+                      <button className="btn btn-sm" style={{ background: eq.decommissioned ? 'var(--accent)' : 'var(--warn)', color: '#000' }} onClick={() => toggleDecommission(eq)}>
+                        {eq.decommissioned ? 'Reactivate' : 'Decomm.'}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filtered.length === 0 && <tr><td colSpan={9} className="empty">No equipment found.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {showModal && (
+        <Modal title={editEq ? 'Edit Equipment' : 'Add Equipment'} onClose={() => setShowModal(false)}
+          footer={<>
+            <button className="btn btn-ghost" onClick={() => setShowModal(false)}>Cancel</button>
+            <button className="btn btn-accent" onClick={handleSave} disabled={loading}>{loading ? 'Saving...' : 'Save'}</button>
+          </>}>
+          {err && <div className="alert alert-danger">{err}</div>}
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Tag *</label><input type="text" value={form.tag} onChange={e => setForm(f => ({ ...f, tag: e.target.value }))} style={{ width: '100%' }} /></div>
+            <div className="form-group"><label className="form-label">Name *</label><input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} style={{ width: '100%' }} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">MCC Room</label>
+              <select value={form.mcc_room} onChange={e => setMccRoom(e.target.value)} style={{ width: '100%' }}>
+                {Object.keys(MCC_ROOMS).map(r => <option key={r}>{r}</option>)}
+              </select>
             </div>
-            {applied.length===0&&<div className="empty">✅ الصندوق فارغ — لا توجد أقفال مطبقة</div>}
-            <table>
-              <thead><tr><th>📦</th><th>القفل</th><th>المعدة</th><th>الموقع</th><th>السبب</th><th>المنفذ</th><th>التاريخ</th><th></th></tr></thead>
-              <tbody>
-                {applied.map(l=>{const lt=LT[l.lock_type];return(
-                  <tr key={l.lock_no} onClick={()=>setHlSlot(hlSlot===l.box_slot?null:l.box_slot)} style={{cursor:"pointer"}}>
-                    <td style={{color:"var(--warn)",fontWeight:700}}>{l.box_slot}</td>
-                    <td style={{color:lt.color,fontWeight:700}}>{lt.icon} {l.lock_no}</td>
-                    <td style={{color:"#fff"}}>{l.equipment?.tag}</td>
-                    <td style={{fontSize:10,color:"var(--muted)"}}>{l.equipment?.mcc_room} {l.equipment?.rack} {l.equipment?.row_position}</td>
-                    <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.reason}</td>
-                    <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.applied_by}</td>
-                    <td>{l.applied_at?.slice(0,10)}</td>
-                    <td><button className="rt" onClick={ev=>{ev.stopPropagation();removeLock(l.lock_no);}}>🔓</button></td>
+            <div className="form-group"><label className="form-label">Plant</label><input type="text" value={form.plant} onChange={e => setForm(f => ({ ...f, plant: e.target.value }))} style={{ width: '100%' }} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Rack</label><input type="text" value={form.rack} onChange={e => setForm(f => ({ ...f, rack: e.target.value }))} style={{ width: '100%' }} placeholder="e.g. SA.14" /></div>
+            <div className="form-group"><label className="form-label">Row Position</label><input type="text" value={form.row_position} onChange={e => setForm(f => ({ ...f, row_position: e.target.value }))} style={{ width: '100%' }} placeholder="e.g. G4" /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Breaker No</label><input type="text" value={form.breaker_no} onChange={e => setForm(f => ({ ...f, breaker_no: e.target.value }))} style={{ width: '100%' }} placeholder="e.g. CB-03" /></div>
+            <div className="form-group"><label className="form-label">Work Permit</label><input type="text" value={form.permit} onChange={e => setForm(f => ({ ...f, permit: e.target.value }))} style={{ width: '100%' }} /></div>
+          </div>
+          <div className="form-group"><label className="form-label">Notes</label><textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} style={{ width: '100%', minHeight: 60 }} /></div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── SUPERVISOR: LOCKS TAB ─────────────────────────────────────────────────────
+function SuperLocks({ locks, equipment, onRefresh }) {
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ lock_no: '', lock_type: 'operations', box_slot: '' });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState('');
+  const [filterType, setFilterType] = useState('all');
+
+  const BOX_SLOTS = [];
+  for (let r = 1; r <= 8; r++) for (const c of ['A','B','C','D','E','F','G','H']) BOX_SLOTS.push(`${c}${r}`);
+
+  const handleAdd = async () => {
+    if (!form.lock_no) { setErr('Lock number required.'); return; }
+    setLoading(true);
+    const { error } = await db.from('locks').insert({ lock_no: form.lock_no, lock_type: form.lock_type, status: 'available', box_slot: form.box_slot || null });
+    if (error) { setErr(error.message); setLoading(false); return; }
+    toast('Lock added'); setShowAdd(false); onRefresh(); setLoading(false);
+  };
+
+  const filteredLocks = filterType === 'all' ? locks : locks.filter(l => l.lock_type === filterType);
+  const appliedLocks = filteredLocks.filter(l => l.status === 'applied');
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="section-header"><div className="card-title" style={{ margin: 0 }}>Box Slot Visualization (8×8)</div></div>
+        <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Columns A–H, Rows 1–8 | 🔒 = applied, color = lock type</div>
+        <div className="box-grid">
+          {BOX_SLOTS.map(slot => {
+            const applied = locks.find(l => l.box_slot === slot && l.status === 'applied');
+            const avail   = locks.find(l => l.box_slot === slot && l.status === 'available');
+            const color   = applied ? lockColor(applied.lock_type) : avail ? lockColor(avail.lock_type) : null;
+            return (
+              <div key={slot} className="box-slot"
+                style={{ borderColor: color || 'var(--b)', background: applied ? `${color}22` : avail ? `${color}11` : 'var(--s2)', borderWidth: applied ? 2 : 1 }}>
+                <div className="box-slot-label">{slot}</div>
+                {applied && <span style={{ fontSize: 8, fontWeight: 800, color, marginTop: 10 }}>{applied.lock_no}</span>}
+                {applied && <span style={{ fontSize: 7 }}>🔒</span>}
+                {!applied && avail && <span style={{ fontSize: 8, color, opacity: .6, marginTop: 10 }}>{avail.lock_no}</span>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="card">
+        <div className="section-header"><div className="card-title" style={{ margin: 0 }}>Hooks Board</div></div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          {['all','operations','mechanical','electrical'].map(t => (
+            <button key={t} className={`btn btn-sm ${filterType === t ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setFilterType(t)}>
+              {t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ))}
+        </div>
+        <div className="hooks-board">
+          {filteredLocks.map(l => (
+            <div key={l.id} className={`hook ${l.lock_type === 'operations' ? 'ops' : l.lock_type === 'mechanical' ? 'mech' : 'elec'}`}
+              style={{ opacity: l.status === 'available' ? .5 : 1 }}>
+              <span style={{ fontSize: 8 }}>{l.status === 'applied' ? '🔒' : '🔓'}</span>
+              <span style={{ fontSize: 9 }}>{l.lock_no}</span>
+              {l.box_slot && <span style={{ fontSize: 7, opacity: .7 }}>{l.box_slot}</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="card">
+        <div className="section-header">
+          <div className="card-title" style={{ margin: 0 }}>Applied Locks ({appliedLocks.length})</div>
+          <button className="btn btn-accent" onClick={() => { setShowAdd(true); setErr(''); }}>+ Add Lock</button>
+        </div>
+        <div className="ovr-x">
+          <table>
+            <thead><tr><th>Lock No</th><th>Type</th><th>Equipment</th><th>Applied By</th><th>Reason</th><th>Permit</th><th>Box Slot</th><th>Applied At</th></tr></thead>
+            <tbody>
+              {appliedLocks.map(l => {
+                const eq = equipment.find(e => e.id === l.equipment_id);
+                return (
+                  <tr key={l.id}>
+                    <td><span style={{ color: lockColor(l.lock_type), fontWeight: 700, fontFamily: 'monospace' }}>{l.lock_no}</span></td>
+                    <td><span className={`badge ${lockBadgeClass(l.lock_type)}`}>{l.lock_type}</span></td>
+                    <td>{eq ? `${eq.tag} — ${eq.name}` : '—'}</td>
+                    <td>{l.applied_by}<br /><span style={{ fontSize: 10, color: 'var(--muted)' }}>{l.applied_id_no}</span></td>
+                    <td>{l.reason || '—'}</td>
+                    <td>{l.permit || '—'}</td>
+                    <td>{l.box_slot || '—'}</td>
+                    <td style={{ fontSize: 11 }}>{l.applied_at ? new Date(l.applied_at).toLocaleString() : ''}</td>
                   </tr>
-                );})}
+                );
+              })}
+              {appliedLocks.length === 0 && <tr><td colSpan={8} className="empty">No locks applied.</td></tr>}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {showAdd && (
+        <Modal title="Add Lock" onClose={() => setShowAdd(false)}
+          footer={<>
+            <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+            <button className="btn btn-accent" onClick={handleAdd} disabled={loading}>{loading ? 'Adding...' : 'Add Lock'}</button>
+          </>}>
+          {err && <div className="alert alert-danger">{err}</div>}
+          <div className="form-group"><label className="form-label">Lock Number</label><input type="text" value={form.lock_no} onChange={e => setForm(f => ({ ...f, lock_no: e.target.value }))} style={{ width: '100%' }} placeholder="e.g. M044" /></div>
+          <div className="form-group"><label className="form-label">Lock Type</label>
+            <select value={form.lock_type} onChange={e => setForm(f => ({ ...f, lock_type: e.target.value }))} style={{ width: '100%' }}>
+              <option value="operations">Operations</option>
+              <option value="mechanical">Mechanical</option>
+              <option value="electrical">Electrical</option>
+            </select>
+          </div>
+          <div className="form-group"><label className="form-label">Box Slot (e.g. A1)</label><input type="text" value={form.box_slot} onChange={e => setForm(f => ({ ...f, box_slot: e.target.value.toUpperCase() }))} style={{ width: '100%' }} placeholder="e.g. A1" /></div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── SUPERVISOR: MCC ROOMS TAB ─────────────────────────────────────────────────
+function SuperMCCRooms({ equipment, locks }) {
+  return (
+    <div className="main">
+      <div className="mcc-grid">
+        {Object.entries(MCC_ROOMS).map(([code, room]) => {
+          const roomEq = equipment.filter(e => e.mcc_room === code);
+          const locked = roomEq.filter(e => locks.some(l => l.equipment_id === e.id && l.status === 'applied'));
+          return (
+            <div key={code} className="mcc-card">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <div style={{ width: 10, height: 10, borderRadius: '50%', background: room.color, flexShrink: 0 }} />
+                <div style={{ fontWeight: 800, fontSize: 15 }}>{code}</div>
+                <span className="badge badge-gray" style={{ marginLeft: 'auto' }}>{room.plant}</span>
+              </div>
+              <div style={{ display: 'flex', gap: 14, marginBottom: 10, fontSize: 12 }}>
+                <span><strong style={{ color: 'var(--accent)' }}>{roomEq.length}</strong> <span style={{ color: 'var(--muted)' }}>Equipment</span></span>
+                <span><strong style={{ color: '#ef4444' }}>{locked.length}</strong> <span style={{ color: 'var(--muted)' }}>Locked</span></span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, marginBottom: 6 }}>RACKS</div>
+              {room.racks.map(rack => {
+                const rackEq = roomEq.filter(e => e.rack === rack);
+                return (
+                  <div key={rack} className="rack-item">
+                    <span style={{ fontFamily: 'monospace', color: room.color, fontWeight: 700, minWidth: 60 }}>{rack}</span>
+                    <span style={{ color: 'var(--muted)' }}>{rackEq.length} equipment</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── SUPERVISOR: REPORTS TAB ───────────────────────────────────────────────────
+function SuperReports({ session }) {
+  const [logs, setLogs] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', person: '', tag: '', status: 'all', lockType: 'all' });
+  const [reportType, setReportType] = useState('internal');
+
+  const fetchLogs = useCallback(async () => {
+    setLoading(true);
+    let q = db.from('audit_log').select('*').order('action_at', { ascending: false });
+    if (filters.dateFrom) q = q.gte('action_at', filters.dateFrom + 'T00:00:00');
+    if (filters.dateTo)   q = q.lte('action_at', filters.dateTo   + 'T23:59:59');
+    if (filters.person)   q = q.ilike('by_name', `%${filters.person}%`);
+    if (filters.tag)      q = q.ilike('eq_tag',  `%${filters.tag}%`);
+    if (filters.lockType !== 'all') q = q.eq('lock_type', filters.lockType);
+    if (filters.status === 'active')    q = q.eq('action', 'APPLIED');
+    if (filters.status === 'completed') q = q.eq('action', 'REMOVED');
+    const { data } = await q.limit(500);
+    setLogs(data || []);
+    setLoading(false);
+  }, [filters]);
+
+  useEffect(() => { fetchLogs(); }, [fetchLogs]);
+
+  const fSet = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+
+  const exportCSV = () => {
+    const headers = ['Action','Lock No','Lock Type','Eq Tag','Eq Name','By','ID No','Reason','Permit','Box Slot','Date/Time'];
+    const rows = logs.map(l => [l.action, l.lock_no, l.lock_type, l.eq_tag, l.eq_name, l.by_name, l.by_id_no, l.reason, l.permit||'', l.box_slot||'', l.action_at ? new Date(l.action_at).toLocaleString() : '']);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
+    const a = document.createElement('a');
+    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'loto_report.csv'; a.click();
+  };
+
+  const generatePDF = () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const now = new Date();
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
+    doc.text('SMART LOTO — Official Lockout/Tagout Report', 148, 15, { align: 'center' });
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
+    const rNo = `LR-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    doc.text(`Report No: ${rNo}`, 14, 28);
+    doc.text(`Generated By: ${session.full_name} (${session.id_no})`, 14, 34);
+    doc.text(`Date Generated: ${now.toLocaleString()}`, 14, 40);
+    if (filters.dateFrom || filters.dateTo) doc.text(`Date Range: ${filters.dateFrom||'—'} to ${filters.dateTo||'—'}`, 14, 46);
+
+    const applied = logs.filter(l => l.action === 'APPLIED');
+    let y = 58;
+    const cols = [14, 30, 55, 72, 90, 105, 125, 155, 175, 205, 230, 255];
+    const headers = ['Eq Tag','Eq Name','Lock No','Type','Permit','Applied By','Applied At','Removed By','Removed At','Duration','Status'];
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+    headers.forEach((h, i) => { if (cols[i]) doc.text(h, cols[i], y); });
+    y += 5; doc.setFont('helvetica', 'normal'); doc.line(14, y, 283, y); y += 4;
+
+    applied.forEach(a => {
+      if (y > 185) { doc.addPage(); y = 20; }
+      const removed = logs.find(r => r.action === 'REMOVED' && r.lock_no === a.lock_no && r.eq_tag === a.eq_tag && new Date(r.action_at) > new Date(a.action_at));
+      let dur = 'Active';
+      if (removed) { const ms = new Date(removed.action_at) - new Date(a.action_at); dur = `${Math.floor(ms/3600000)}h ${Math.floor((ms%3600000)/60000)}m`; }
+      const row = [
+        (a.eq_tag||'').slice(0,10), (a.eq_name||'').slice(0,14), (a.lock_no||'').slice(0,10),
+        (a.lock_type||'').slice(0,8), (a.permit||'').slice(0,12), (a.by_name||'').slice(0,14),
+        a.action_at ? new Date(a.action_at).toLocaleDateString('en-GB') : '',
+        removed ? (removed.by_name||'').slice(0,14) : '—',
+        removed ? new Date(removed.action_at).toLocaleDateString('en-GB') : '—',
+        dur, removed ? 'Completed' : 'Active'
+      ];
+      row.forEach((c, i) => { if (cols[i]) doc.text(String(c), cols[i], y); });
+      y += 6;
+    });
+    if (applied.length === 0) doc.text('No records found for selected filters.', 14, y);
+    y += 14; doc.line(14, y, 283, y); y += 8;
+    doc.text('Supervisor: _______________________________    Date: _______________', 14, y);
+    doc.save('smart_loto_official_report.pdf');
+  };
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="section-header">
+          <div className="card-title" style={{ margin: 0 }}>Reports</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className={`btn btn-sm ${reportType === 'internal' ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setReportType('internal')}>Internal Report</button>
+            <button className={`btn btn-sm ${reportType === 'pdf' ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setReportType('pdf')}>Official PDF</button>
+          </div>
+        </div>
+        <div className="filter-row" style={{ marginBottom: 14 }}>
+          {[
+            { label: 'Date From', el: <input type="date" value={filters.dateFrom} onChange={e => fSet('dateFrom', e.target.value)} /> },
+            { label: 'Date To',   el: <input type="date" value={filters.dateTo}   onChange={e => fSet('dateTo',   e.target.value)} /> },
+            { label: 'Person',    el: <input type="text" value={filters.person}   onChange={e => fSet('person',   e.target.value)} placeholder="Name..." /> },
+            { label: 'Eq Tag',    el: <input type="text" value={filters.tag}      onChange={e => fSet('tag',      e.target.value)} placeholder="Tag..." /> },
+            { label: 'Status',    el: <select value={filters.status} onChange={e => fSet('status', e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="completed">Completed</option></select> },
+            { label: 'Lock Type', el: <select value={filters.lockType} onChange={e => fSet('lockType', e.target.value)}><option value="all">All</option><option value="operations">Operations</option><option value="mechanical">Mechanical</option><option value="electrical">Electrical</option></select> },
+          ].map((f, i) => (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <label className="form-label">{f.label}</label>
+              {f.el}
+            </div>
+          ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'flex-end' }}>
+            <button className="btn btn-accent" onClick={fetchLogs} disabled={loading}>{loading ? 'Loading...' : 'Apply'}</button>
+          </div>
+        </div>
+        {reportType === 'internal' && <>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{logs.length} records</span>
+            <button className="btn btn-ghost btn-sm" onClick={exportCSV}>⬇ Export CSV</button>
+          </div>
+          <div className="ovr-x">
+            <table>
+              <thead><tr><th>Action</th><th>Lock No</th><th>Type</th><th>Equipment</th><th>By</th><th>Reason</th><th>Permit</th><th>Box Slot</th><th>Date/Time</th></tr></thead>
+              <tbody>
+                {logs.map(l => (
+                  <tr key={l.id}>
+                    <td><span className={`badge ${l.action === 'APPLIED' ? 'badge-red' : 'badge-green'}`}>{l.action}</span></td>
+                    <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: lockColor(l.lock_type) }}>{l.lock_no}</span></td>
+                    <td><span className={`badge ${lockBadgeClass(l.lock_type)}`}>{l.lock_type}</span></td>
+                    <td>{l.eq_tag}{l.eq_name && <span style={{ color: 'var(--muted)', fontSize: 11 }}> — {l.eq_name}</span>}</td>
+                    <td>{l.by_name}<br /><span style={{ fontSize: 10, color: 'var(--muted)' }}>{l.by_id_no}</span></td>
+                    <td>{l.reason || '—'}</td>
+                    <td>{l.permit || '—'}</td>
+                    <td>{l.box_slot || '—'}</td>
+                    <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{l.action_at ? new Date(l.action_at).toLocaleString() : ''}</td>
+                  </tr>
+                ))}
+                {!loading && logs.length === 0 && <tr><td colSpan={9} className="empty">No records found.</td></tr>}
               </tbody>
             </table>
           </div>
-        </div>
-      )}
-
-      {tab==="rooms"&&(
-        <div className="main">
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(200px,1fr))",gap:10}}>
-            {Object.entries(rooms).map(([k,v])=>{
-              const re=eq.filter(e=>e.mcc_room===k),rl=re.filter(e=>eqLocks(e.id).length>0).length;
-              return(
-                <div key={k} style={{background:"var(--s1)",border:"1px solid "+(selRoom===k?"var(--accent)":"var(--b)"),borderRadius:10,padding:12,cursor:"pointer"}} onClick={()=>setSelRoom(selRoom===k?null:k)}>
-                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
-                    <div style={{width:9,height:9,borderRadius:"50%",background:v.color}}/>
-                    <div><div style={{fontSize:13,fontWeight:800,color:"#fff"}}>{k}</div><div style={{fontSize:10,color:"var(--muted)"}}>{v.label}</div></div>
-                  </div>
-                  <div style={{fontSize:22,fontWeight:900,fontFamily:"monospace",color:v.color}}>{rl}</div>
-                  <div style={{fontSize:10,color:"var(--muted)",marginBottom:8}}>قفل من {re.length} معدة</div>
-                  {(v.racks||[]).map(r=>{const rc=re.filter(e=>e.rack===r&&eqLocks(e.id).length>0).length;return(
-                    <div key={r} style={{display:"flex",justifyContent:"space-between",padding:"3px 0",borderBottom:"1px solid var(--b)",fontSize:11,fontFamily:"monospace"}}>
-                      <span>{r}</span>{rc>0&&<span style={{color:"var(--danger)",fontWeight:700}}>🔒{rc}</span>}
-                    </div>
-                  );})}
-                </div>
-              );
-            })}
+        </>}
+        {reportType === 'pdf' && (
+          <div style={{ textAlign: 'center', padding: '30px 0' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Official PDF Report</div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20, maxWidth: 480, margin: '0 auto 20px' }}>
+              Generates a formatted landscape PDF using current filter settings. Includes equipment, lock details, applied/removed times, duration, and supervisor signature line.
+            </div>
+            <button className="btn btn-accent" style={{ fontSize: 14, padding: '10px 28px' }} onClick={generatePDF}>⬇ Download PDF Report</button>
           </div>
-          {selRoom&&(
-            <div className="twrap">
-              <div className="th2"><div className="stitle" style={{margin:0}}>{rooms[selRoom]?.label}</div></div>
-              <table>
-                <thead><tr><th>المعدة</th><th>الاسم</th><th>الراك</th><th>الصف</th><th>الأقفال</th><th>الحالة</th></tr></thead>
-                <tbody>
-                  {eq.filter(e=>e.mcc_room===selRoom).map(e=>{
-                    const st=e.decommissioned?"decomm":eqSt(e.id,locks);
-                    return(
-                      <tr key={e.id}>
-                        <td style={{color:"#fff",fontWeight:700}}>{e.tag}</td>
-                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:12}}>{e.name}</td>
-                        <td style={{color:"var(--accent)"}}>{e.rack}</td>
-                        <td>{e.row_position}</td>
-                        <td>{eqLocks(e.id).map(l=>(LT[l.lock_type]?.icon||"")+l.lock_no+"(📦"+l.box_slot+")").join(" ")||"—"}</td>
-                        <td style={{color:SI[st].color,fontWeight:700}}>{SI[st].label}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {tab==="reports"&&(
-        <div className="main">
-          {!isSup&&<div className="empty" style={{padding:40}}>⭐ التقارير للمشرف فقط</div>}
-          {isSup&&(
-            <Fragment>
-              <div className="twrap">
-                <div className="th2"><div className="stitle" style={{margin:0}}>🔴 الأقفال المطبقة الآن</div><button className="exp" onClick={exportCSV}>⬇ تصدير CSV</button></div>
-                <table>
-                  <thead><tr><th>📦</th><th>القفل</th><th>المعدة</th><th>الموقع</th><th>السبب</th><th>المنفذ</th><th>التاريخ</th></tr></thead>
-                  <tbody>
-                    {applied.map(l=>{const lt=LT[l.lock_type];return(
-                      <tr key={l.lock_no}>
-                        <td style={{color:"var(--warn)",fontWeight:700}}>{l.box_slot}</td>
-                        <td style={{color:lt.color,fontWeight:700}}>{lt.icon} {l.lock_no}</td>
-                        <td style={{color:"#fff"}}>{l.equipment?.tag}</td>
-                        <td style={{fontSize:10}}>{l.equipment?.mcc_room} {l.equipment?.rack} {l.equipment?.row_position}</td>
-                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.reason}</td>
-                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{l.applied_by}</td>
-                        <td>{l.applied_at?.slice(0,10)}</td>
-                      </tr>
-                    );})}
-                    {applied.length===0&&<tr><td colSpan={7} style={{textAlign:"center",padding:20,color:"var(--muted)"}}>✅ لا توجد أقفال مطبقة الآن</td></tr>}
-                  </tbody>
-                </table>
-              </div>
-              <div className="twrap">
-                <div className="th2"><div className="stitle" style={{margin:0}}>📜 سجل الأوديت</div></div>
-                {log.length===0&&<div className="empty">لا توجد أحداث بعد</div>}
-                <table>
-                  <thead><tr><th>الإجراء</th><th>القفل</th><th>المعدة</th><th>السبب</th><th>المنفذ</th><th>📦</th><th>الوقت</th></tr></thead>
-                  <tbody>
-                    {log.map(h=>(
-                      <tr key={h.id}>
-                        <td style={{color:h.action==="APPLIED"?"var(--danger)":"var(--accent)",fontWeight:700}}>{h.action==="APPLIED"?"🔒 إغلاق":h.action==="REMOVED"?"🔓 فتح":h.action==="ADDED_EQ"?"🏭 معدة":"🔑 قفل"}</td>
-                        <td style={{color:LT[h.lock_type]?.color||"var(--muted)",fontWeight:700}}>{h.lock_no||"—"}</td>
-                        <td style={{color:"#fff"}}>{h.eq_tag||"—"}</td>
-                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{h.reason||"—"}</td>
-                        <td style={{fontFamily:"Tajawal,sans-serif",fontSize:11}}>{h.by_name||"—"}</td>
-                        <td style={{color:"var(--warn)"}}>{h.box_slot||"—"}</td>
-                        <td style={{fontSize:10}}>{h.action_at?.slice(0,16).replace("T"," ")}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Fragment>
-          )}
-        </div>
-      )}
-
-      {/* APPLY MODAL */}
-      {showApply&&(()=>{
-        const e=eq.find(x=>x.id===showApply);
-        return(
-          <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowApply(null);}}>
-            <div className="modal">
-              <div className="mt">🔒 تطبيق قفل</div>
-              <div className="ib">📍 <strong>{e?.tag}</strong> — {e?.mcc_room} ← {e?.rack} ← صف {e?.row_position}<br/>خذ القفل من الخطاف ← ضعه على البريكر ← ضع المفتاح في الصندوق</div>
-              <div className="fg">
-                <label className="fl">اختر القفل من الخطاطيف</label>
-                <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
-                  {avail.map(l=>{const lt=LT[l.lock_type];return(
-                    <span key={l.lock_no} className={"chip"+(pickedLk===l.lock_no?" pk":"")} style={{color:lt.color,borderColor:lt.color+(pickedLk===l.lock_no?"":"44"),background:lt.color+(pickedLk===l.lock_no?"22":"0D")}} onClick={()=>setPickedLk(l.lock_no)}>{lt.icon} {l.lock_no}</span>
-                  );})}
-                  {avail.length===0&&<div style={{color:"var(--danger)",fontSize:12,padding:8}}>⚠️ لا توجد أقفال متاحة — أضف أقفالاً بالضغط على "+ قفل"</div>}
-                </div>
-              </div>
-              <div className="fg">
-                <label className="fl">خانة الصندوق للمفتاح</label>
-                <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <input className="fi" style={{flex:1}} placeholder="A3" value={pickedSl} onChange={ev=>setPickedSl(ev.target.value.toUpperCase())}/>
-                  <span style={{fontSize:11,color:"var(--accent)"}}>مقترح: {nextSlot()}</span>
-                </div>
-              </div>
-              <div className="fg">
-                <label className="fl">الاسم</label>
-                <select className="fs" value={aForm.appliedBy} onChange={ev=>setAForm(p=>({...p,appliedBy:ev.target.value}))}>
-                  <option value="">اختر الموظف...</option>
-                  {staff.map(p=><option key={p.id} value={p.full_name}>{p.full_name} — {p.id_no}</option>)}
-                </select>
-              </div>
-              <div className="fg">
-                <label className="fl">سبب الإغلاق</label>
-                <select className="fs" value={aForm.reason} onChange={ev=>setAForm(p=>({...p,reason:ev.target.value}))}>
-                  {REASONS.map(r=><option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-              <div className="fg"><label className="fl">رقم التصريح</label><input className="fi" placeholder="WP-2025-" value={aForm.permit} onChange={ev=>setAForm(p=>({...p,permit:ev.target.value}))}/></div>
-              <div className="mac">
-                <button className="can" onClick={()=>setShowApply(null)}>إلغاء</button>
-                <button className="con" disabled={!pickedLk||!pickedSl||!aForm.appliedBy} onClick={()=>applyLock(showApply)}>🔒 تطبيق {pickedLk} → 📦 {pickedSl}</button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* ADD EQ */}
-      {showAddEq&&(
-        <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowAddEq(false);}}>
-          <div className="modal">
-            <div className="mt">🏭 إضافة معدة جديدة</div>
-            <div className="two">
-              <div className="fg"><label className="fl">رقم المعدة (Tag)</label><input className="fi" placeholder="12-P-9113-M" value={eForm.tag} onChange={ev=>setEForm(p=>({...p,tag:ev.target.value}))}/></div>
-              <div className="fg"><label className="fl">رقم التصريح</label><input className="fi" placeholder="WP-2025-" value={eForm.permit} onChange={ev=>setEForm(p=>({...p,permit:ev.target.value}))}/></div>
-            </div>
-            <div className="fg"><label className="fl">اسم المعدة</label><input className="fi" placeholder="Jacket Circulation Pump..." value={eForm.name} onChange={ev=>setEForm(p=>({...p,name:ev.target.value}))}/></div>
-            <div className="two">
-              <div className="fg">
-                <label className="fl">غرفة MCC</label>
-                <select className="fs" value={eForm.mcc_room} onChange={ev=>setEForm(p=>({...p,mcc_room:ev.target.value,rack:rooms[ev.target.value]?.racks?.[0]||""}))}>
-                  {Object.keys(rooms).map(k=><option key={k} value={k}>{k}</option>)}
-                </select>
-              </div>
-              <div className="fg">
-                <label className="fl">الراك</label>
-                <select className="fs" value={eForm.rack} onChange={ev=>setEForm(p=>({...p,rack:ev.target.value}))}>
-                  {(rooms[eForm.mcc_room]?.racks||[]).map(r=><option key={r} value={r}>{r}</option>)}
-                </select>
-              </div>
-            </div>
-            <div className="fg"><label className="fl">الصف (مثل G4)</label><input className="fi" placeholder="G4" value={eForm.row_position} onChange={ev=>setEForm(p=>({...p,row_position:ev.target.value}))}/></div>
-            <div className="mac">
-              <button className="can" onClick={()=>setShowAddEq(false)}>إلغاء</button>
-              <button className="con" disabled={!eForm.tag||!eForm.name} onClick={addEq}>✅ إضافة المعدة</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ADD LOCK */}
-      {showAddLk&&(
-        <div className="overlay" onClick={ev=>{if(ev.target===ev.currentTarget)setShowAddLk(false);}}>
-          <div className="modal">
-            <div className="mt">🔑 إضافة قفل للنظام</div>
-            <div className="ib">القفل الجديد سيظهر على الخطاطيف كـ "متاح" ✅</div>
-            <div className="two">
-              <div className="fg"><label className="fl">رقم القفل</label><input className="fi" placeholder="M101" value={lForm.lock_no} onChange={ev=>setLForm(p=>({...p,lock_no:ev.target.value.toUpperCase()}))}/></div>
-              <div className="fg">
-                <label className="fl">النوع</label>
-                <select className="fs" value={lForm.lock_type} onChange={ev=>setLForm(p=>({...p,lock_type:ev.target.value}))}>
-                  <option value="operations">🟢 مشغل</option>
-                  <option value="mechanical">🔵 ميكانيكي</option>
-                  <option value="electrical">🔴 كهربائي</option>
-                </select>
-              </div>
-            </div>
-            <div className="mac">
-              <button className="can" onClick={()=>setShowAddLk(false)}>إلغاء</button>
-              <button className="con" disabled={!lForm.lock_no} onClick={addLk}>✅ إضافة للخطاطيف</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toast&&<div className="toast">{toast}</div>}
+        )}
+      </div>
     </div>
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+// ── SUPERVISOR: PERSONNEL TAB ─────────────────────────────────────────────────
+function SuperPersonnel() {
+  const [personnel, setPersonnel] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [q, setQ] = useState('');
+  const [form, setForm] = useState({ full_name: '', id_no: '', employee_id: '', role: 'operations', company: '', shift: '' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const fetchPersonnel = useCallback(async () => {
+    setLoading(true);
+    const { data } = await db.from('personnel').select('*').order('full_name');
+    setPersonnel(data || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchPersonnel(); }, [fetchPersonnel]);
+
+  const filtered = personnel.filter(p => !q || p.full_name.toLowerCase().includes(q.toLowerCase()) || (p.id_no||'').includes(q));
+
+  const handleAdd = async () => {
+    if (!form.full_name || !form.id_no) { setErr('Name and ID No required.'); return; }
+    setSaving(true);
+    const { error } = await db.from('personnel').insert({ ...form, active: true, first_login: true, password_hash: null });
+    if (error) { setErr(error.message); setSaving(false); return; }
+    toast('Employee added'); setShowAdd(false); fetchPersonnel(); setSaving(false);
+  };
+
+  const toggleActive = async p => {
+    await db.from('personnel').update({ active: !p.active }).eq('id', p.id);
+    toast(p.active ? 'Employee deactivated' : 'Employee activated');
+    fetchPersonnel();
+    setSelected(s => s ? { ...s, active: !s.active } : null);
+  };
+
+  const resetPassword = async p => {
+    await db.from('personnel').update({ first_login: true, password_hash: null }).eq('id', p.id);
+    toast(`Password reset for ${p.full_name}`);
+  };
+
+  const changeRole = async (p, newRole) => {
+    await db.from('personnel').update({ role: newRole }).eq('id', p.id);
+    toast('Role updated'); fetchPersonnel();
+    setSelected(s => s ? { ...s, role: newRole } : null);
+  };
+
+  return (
+    <div className="main">
+      <div className="two-col">
+        <div className="card">
+          <div className="section-header">
+            <div className="card-title" style={{ margin: 0 }}>Personnel ({personnel.length})</div>
+            <button className="btn btn-accent" onClick={() => { setShowAdd(true); setErr(''); setForm({ full_name:'', id_no:'', employee_id:'', role:'operations', company:'', shift:'' }); }}>+ Add Employee</button>
+          </div>
+          <div className="search-row" style={{ marginBottom: 12 }}>
+            <div className="search-box" style={{ flex: 1 }}>
+              <span style={{ color: 'var(--muted)' }}>🔍</span>
+              <input type="text" placeholder="Search by name or ID..." value={q} onChange={e => setQ(e.target.value)} />
+            </div>
+          </div>
+          {loading ? <div className="loading-center"><div className="spin" /></div> : (
+            <div className="emp-list">
+              {filtered.map(p => (
+                <div key={p.id} className={`emp-item ${selected?.id === p.id ? 'on' : ''}`} onClick={() => setSelected(p)}>
+                  <div className="emp-avatar">{(p.full_name || '?').charAt(0).toUpperCase()}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.full_name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)' }}>{p.id_no} · {p.company}</div>
+                  </div>
+                  <span className={`role-badge role-${p.role}`}>{p.role}</span>
+                  {!p.active && <span className="badge badge-gray" style={{ fontSize: 10 }}>Inactive</span>}
+                </div>
+              ))}
+              {filtered.length === 0 && <div className="empty">No employees found.</div>}
+            </div>
+          )}
+        </div>
+        <div>
+          {selected ? (
+            <div className="detail-panel">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div className="emp-avatar" style={{ width: 48, height: 48, fontSize: 20, borderRadius: '50%' }}>{(selected.full_name||'?').charAt(0).toUpperCase()}</div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 16 }}>{selected.full_name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--muted)' }}>{selected.id_no}</div>
+                </div>
+              </div>
+              <div className="detail-row"><span className="detail-label">Employee ID</span><span>{selected.employee_id || '—'}</span></div>
+              <div className="detail-row">
+                <span className="detail-label">Role</span>
+                <select value={selected.role} onChange={e => changeRole(selected, e.target.value)}
+                  style={{ background: 'var(--s3)', border: '1px solid var(--b)', color: '#E2E8F0', borderRadius: 6, padding: '3px 8px', fontSize: 12 }}>
+                  <option value="supervisor">Supervisor</option>
+                  <option value="operations">Operations</option>
+                  <option value="mechanical">Mechanical</option>
+                  <option value="electrical">Electrical</option>
+                </select>
+              </div>
+              <div className="detail-row"><span className="detail-label">Company</span><span>{selected.company || '—'}</span></div>
+              <div className="detail-row"><span className="detail-label">Shift</span><span>{selected.shift || '—'}</span></div>
+              <div className="detail-row"><span className="detail-label">Status</span><span className={`badge ${selected.active ? 'badge-green' : 'badge-gray'}`}>{selected.active ? 'Active' : 'Inactive'}</span></div>
+              <div className="detail-row"><span className="detail-label">First Login</span><span style={{ fontSize: 12, color: selected.first_login ? 'var(--warn)' : '#86efac' }}>{selected.first_login ? 'Password not set' : 'Password set'}</span></div>
+              <div className="detail-row"><span className="detail-label">Last Login</span><span style={{ fontSize: 11 }}>{selected.last_login ? new Date(selected.last_login).toLocaleString() : 'Never'}</span></div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+                <button className="btn btn-warn" onClick={() => resetPassword(selected)}>Reset Password</button>
+                <button className={`btn ${selected.active ? 'btn-danger' : 'btn-ghost'}`} onClick={() => toggleActive(selected)}>
+                  {selected.active ? 'Deactivate Employee' : 'Activate Employee'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="detail-panel" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200, color: 'var(--muted)', fontSize: 13 }}>
+              Select an employee to view details
+            </div>
+          )}
+        </div>
+      </div>
+      {showAdd && (
+        <Modal title="Add New Employee" onClose={() => setShowAdd(false)}
+          footer={<>
+            <button className="btn btn-ghost" onClick={() => setShowAdd(false)}>Cancel</button>
+            <button className="btn btn-accent" onClick={handleAdd} disabled={saving}>{saving ? 'Adding...' : 'Add Employee'}</button>
+          </>}>
+          {err && <div className="alert alert-danger">{err}</div>}
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Full Name *</label><input type="text" value={form.full_name} onChange={e => setForm(f => ({ ...f, full_name: e.target.value }))} style={{ width: '100%' }} /></div>
+            <div className="form-group"><label className="form-label">ID No *</label><input type="text" value={form.id_no} onChange={e => setForm(f => ({ ...f, id_no: e.target.value }))} style={{ width: '100%' }} /></div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Employee ID</label><input type="text" value={form.employee_id} onChange={e => setForm(f => ({ ...f, employee_id: e.target.value }))} style={{ width: '100%' }} /></div>
+            <div className="form-group"><label className="form-label">Role</label>
+              <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} style={{ width: '100%' }}>
+                <option value="supervisor">Supervisor</option>
+                <option value="operations">Operations</option>
+                <option value="mechanical">Mechanical</option>
+                <option value="electrical">Electrical</option>
+              </select>
+            </div>
+          </div>
+          <div className="form-row">
+            <div className="form-group"><label className="form-label">Company</label><input type="text" value={form.company} onChange={e => setForm(f => ({ ...f, company: e.target.value }))} style={{ width: '100%' }} /></div>
+            <div className="form-group"><label className="form-label">Shift</label><input type="text" value={form.shift} onChange={e => setForm(f => ({ ...f, shift: e.target.value }))} style={{ width: '100%' }} placeholder="e.g. Day/Night/A/B" /></div>
+          </div>
+          <div className="alert alert-warn" style={{ marginTop: 4 }}>New employee must set a password on first login.</div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
+// ── SUPERVISOR APP ────────────────────────────────────────────────────────────
+function SupervisorApp({ session, equipment, locks, onRefresh }) {
+  const [tab, setTab] = useState('dashboard');
+  const TABS = [
+    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'equipment', label: 'Equipment' },
+    { id: 'locks',     label: 'Locks' },
+    { id: 'mcc',       label: 'MCC Rooms' },
+    { id: 'reports',   label: 'Reports' },
+    { id: 'personnel', label: 'Personnel' },
+  ];
+  return (
+    <>
+      <div className="tabs">
+        {TABS.map(t => <button key={t.id} className={`tab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
+      </div>
+      {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {tab === 'equipment' && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
+      {tab === 'locks'     && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
+      {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
+      {tab === 'reports'   && <SuperReports session={session} />}
+      {tab === 'personnel' && <SuperPersonnel />}
+    </>
+  );
+}
+
+// ── OPERATIONS APP ────────────────────────────────────────────────────────────
+function OperationsApp({ session, equipment, locks, onRefresh }) {
+  const [tab, setTab] = useState('mylocks');
+  return (
+    <>
+      <div className="tabs">
+        <button className={`tab ${tab === 'mylocks' ? 'on' : ''}`} onClick={() => setTab('mylocks')}>My Locks</button>
+        <button className={`tab ${tab === 'search'  ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
+      </div>
+      {tab === 'mylocks' && <OpsMyLocksTab   session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'search'  && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+    </>
+  );
+}
+
+// ── MECHANICAL / ELECTRICAL APP ───────────────────────────────────────────────
+function MechElecApp({ session, equipment, locks, onRefresh }) {
+  const [tab, setTab] = useState('smart');
+  return (
+    <>
+      <div className="tabs">
+        <button className={`tab ${tab === 'smart'  ? 'on' : ''}`} onClick={() => setTab('smart')}>Smart List</button>
+        <button className={`tab ${tab === 'search' ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
+      </div>
+      {tab === 'smart'  && <SmartListTab      session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'search' && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+    </>
+  );
+}
+
+// ── LOGIN ─────────────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [idNo, setIdNo] = useState('');
+  const [pw, setPw] = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async e => {
+    e.preventDefault(); setErr(''); setLoading(true);
+    try {
+      const { data, error } = await db.from('personnel').select('*').eq('id_no', idNo.trim()).eq('active', true).single();
+      if (error || !data) { setErr('Employee not found or inactive.'); setLoading(false); return; }
+      if (!data.password_hash || data.first_login) { onLogin({ ...data, _needSetPw: true }); return; }
+      const hash = await sha256(pw);
+      if (hash !== data.password_hash) { setErr('Incorrect password.'); setLoading(false); return; }
+      await db.from('personnel').update({ last_login: new Date().toISOString() }).eq('id', data.id);
+      const session = { id: data.id, full_name: data.full_name, id_no: data.id_no, role: data.role, company: data.company, shift: data.shift };
+      localStorage.setItem('loto_session', JSON.stringify(session));
+      onLogin(session);
+    } catch (ex) { setErr('Error: ' + ex.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-brand">
+          <div className="login-icon">L</div>
+          <div className="login-title">Smart LOTO</div>
+          <div className="login-sub">Lockout/Tagout Management System</div>
+        </div>
+        {err && <div className="alert alert-danger">{err}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">Employee I.D. No</label>
+            <input type="text" value={idNo} onChange={e => setIdNo(e.target.value)} required placeholder="e.g. EMP-001" style={{ width: '100%' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input type="password" value={pw} onChange={e => setPw(e.target.value)} placeholder="Enter password" style={{ width: '100%' }} />
+          </div>
+          <button className="btn btn-accent" type="submit" disabled={loading} style={{ width: '100%', marginTop: 8, padding: '10px' }}>
+            {loading ? 'Signing in...' : 'Sign In'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── SET PASSWORD ──────────────────────────────────────────────────────────────
+function SetPasswordScreen({ user, onDone }) {
+  const [pw1, setPw1] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [err, setErr] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async e => {
+    e.preventDefault(); setErr('');
+    if (pw1.length < 6) { setErr('Password must be at least 6 characters.'); return; }
+    if (pw1 !== pw2)    { setErr('Passwords do not match.'); return; }
+    setLoading(true);
+    const hash = await sha256(pw1);
+    const { error } = await db.from('personnel').update({ password_hash: hash, first_login: false, last_login: new Date().toISOString() }).eq('id', user.id);
+    if (error) { setErr('Failed: ' + error.message); setLoading(false); return; }
+    const session = { id: user.id, full_name: user.full_name, id_no: user.id_no, role: user.role, company: user.company, shift: user.shift };
+    localStorage.setItem('loto_session', JSON.stringify(session));
+    toast('Password set successfully!');
+    onDone(session);
+  };
+
+  return (
+    <div className="login-wrap">
+      <div className="login-card">
+        <div className="login-brand">
+          <div className="login-icon">L</div>
+          <div className="login-title">Set Your Password</div>
+          <div className="login-sub">Welcome, {user.full_name}. Please set a new password to continue.</div>
+        </div>
+        {err && <div className="alert alert-danger">{err}</div>}
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label">New Password (min 6 characters)</label>
+            <input type="password" value={pw1} onChange={e => setPw1(e.target.value)} required style={{ width: '100%' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Confirm Password</label>
+            <input type="password" value={pw2} onChange={e => setPw2(e.target.value)} required style={{ width: '100%' }} />
+          </div>
+          <button className="btn btn-accent" type="submit" disabled={loading} style={{ width: '100%', marginTop: 8, padding: '10px' }}>
+            {loading ? 'Saving...' : 'Set Password & Continue'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ── ROOT APP ──────────────────────────────────────────────────────────────────
+function App() {
+  const [session, setSession]       = useState(null);
+  const [pendingUser, setPendingUser] = useState(null);
+  const [equipment, setEquipment]   = useState([]);
+  const [locks, setLocks]           = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const timerRef = useRef(null);
+
+  useEffect(() => {
+    const stored = localStorage.getItem('loto_session');
+    if (stored) { try { setSession(JSON.parse(stored)); } catch (e) {} }
+    setLoading(false);
+  }, []);
+
+  const fetchData = useCallback(async () => {
+    const [eqRes, lockRes] = await Promise.all([
+      db.from('equipment').select('*').order('tag'),
+      db.from('locks').select('*').order('lock_no'),
+    ]);
+    setEquipment(eqRes.data || []);
+    setLocks(lockRes.data || []);
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    fetchData();
+    timerRef.current = setInterval(fetchData, 30000);
+    return () => clearInterval(timerRef.current);
+  }, [session, fetchData]);
+
+  const handleLogin = user => {
+    if (user._needSetPw) { setPendingUser(user); return; }
+    setSession(user);
+  };
+
+  const handleSetPwDone = sess => { setPendingUser(null); setSession(sess); };
+
+  const handleLogout = () => {
+    localStorage.removeItem('loto_session');
+    setSession(null); setEquipment([]); setLocks([]);
+  };
+
+  if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><div className="spin" /></div>;
+  if (pendingUser) return <><SetPasswordScreen user={pendingUser} onDone={handleSetPwDone} /><Toasts /></>;
+  if (!session)    return <><LoginScreen onLogin={handleLogin} /><Toasts /></>;
+
+  return (
+    <>
+      <nav>
+        <div className="brand">
+          <div className="brand-icon">L</div>
+          <div>
+            <div className="brand-text">Smart LOTO</div>
+            <div className="brand-sub">Lockout/Tagout System</div>
+          </div>
+        </div>
+        <div className="live-pill">
+          <div className="live-dot" />
+          <span>LIVE</span>
+        </div>
+        <div className="nav-right">
+          <div className="user-pill">
+            <span style={{ fontWeight: 700 }}>{session.full_name}</span>
+            <span className={`role-badge role-${session.role}`}>{session.role}</span>
+            {session.shift && <span style={{ fontSize: 10, color: 'var(--muted)' }}>Shift: {session.shift}</span>}
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Sign Out</button>
+        </div>
+      </nav>
+      {session.role === 'supervisor'  && <SupervisorApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'operations'  && <OperationsApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {(session.role === 'mechanical' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      <Toasts />
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 </script>
 </body>
 </html>
