@@ -331,6 +331,117 @@ function HooksView({ lockType, locks }) {
   );
 }
 
+// ── PHOTO HELPERS ─────────────────────────────────────────────────────────────
+async function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const MAX = 800;
+      let w = img.width, h = img.height;
+      if (w > h) { if (w > MAX) { h = Math.round(h * MAX / w); w = MAX; } }
+      else        { if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; } }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Compression failed')), 'image/jpeg', 0.65);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Image load failed')); };
+    img.src = url;
+  });
+}
+
+async function uploadLockPhoto(file, lockNo, photoType) {
+  const blob  = await compressImage(file);
+  const path  = `${lockNo}/${Date.now()}_${photoType}.jpg`;
+  const { error } = await db.storage.from('lock-photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true });
+  if (error) throw new Error(error.message);
+  const { data } = db.storage.from('lock-photos').getPublicUrl(path);
+  return data.publicUrl;
+}
+
+// ── PHOTO CAPTURE COMPONENT ───────────────────────────────────────────────────
+function PhotoCapture({ label, file, onFile }) {
+  const inputRef = useRef();
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    if (file) { const u = URL.createObjectURL(file); setPreview(u); return () => URL.revokeObjectURL(u); }
+    else setPreview(null);
+  }, [file]);
+  const handleChange = e => onFile(e.target.files?.[0] || null);
+  const clear = e => { e.stopPropagation(); onFile(null); if (inputRef.current) inputRef.current.value = ''; };
+  return (
+    <div style={{ marginBottom:10 }}>
+      <div style={{ fontSize:11, color:'var(--muted)', marginBottom:5, fontWeight:600 }}>{label} <span style={{ fontWeight:400 }}>(optional)</span></div>
+      {preview ? (
+        <div style={{ position:'relative' }}>
+          <img src={preview} alt="preview"
+            style={{ width:'100%', maxHeight:150, objectFit:'cover', borderRadius:8, display:'block', border:'1px solid var(--b)' }} />
+          <button onClick={clear}
+            style={{ position:'absolute', top:4, right:4, background:'rgba(0,0,0,.75)', color:'#fff', border:'none', borderRadius:'50%', width:22, height:22, cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', justifyContent:'center' }}>×</button>
+          <div style={{ fontSize:9, color:'var(--accent)', marginTop:3 }}>✓ Photo ready</div>
+        </div>
+      ) : (
+        <button onClick={() => inputRef.current?.click()}
+          style={{ width:'100%', padding:'12px', border:'1px dashed var(--b)', borderRadius:8, background:'var(--s2)', color:'var(--muted)', cursor:'pointer', fontSize:12, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          📷 {label}
+        </button>
+      )}
+      <input ref={inputRef} type="file" accept="image/*" capture="environment"
+        style={{ display:'none' }} onChange={handleChange} />
+    </div>
+  );
+}
+
+// ── PHOTO GALLERY MODAL ───────────────────────────────────────────────────────
+function PhotoGallery({ equipmentId, eqTag, onClose }) {
+  const [photos, setPhotos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState(null);
+  useEffect(() => {
+    db.from('lock_photos').select('*').eq('equipment_id', equipmentId)
+      .order('taken_at', { ascending: false })
+      .then(({ data }) => { setPhotos(data || []); setLoading(false); });
+  }, [equipmentId]);
+  const typeLabel = { on_breaker:'Lock on Breaker', key_in_box:'Key in Box', on_hook:'Returned to Hook' };
+  return (
+    <Modal title={`📷 Photos — ${eqTag}`} onClose={onClose}
+      footer={<button className="btn btn-ghost" onClick={onClose}>Close</button>}>
+      {loading ? <div className="loading-center"><div className="spin" /></div> : photos.length === 0 ? (
+        <div className="empty">No photos for this equipment yet.</div>
+      ) : (
+        <div>
+          {selected && (
+            <div style={{ marginBottom:12, position:'relative' }}>
+              <img src={selected.photo_url} alt={selected.photo_type}
+                style={{ width:'100%', maxHeight:260, objectFit:'contain', borderRadius:8, background:'#000', display:'block' }} />
+              <div style={{ fontSize:11, color:'var(--muted)', marginTop:4, textAlign:'center' }}>
+                {typeLabel[selected.photo_type] || selected.photo_type} · {selected.taken_by} · {selected.taken_at ? new Date(selected.taken_at).toLocaleString() : ''}
+              </div>
+              <button onClick={() => setSelected(null)}
+                style={{ position:'absolute', top:4, right:4, background:'rgba(0,0,0,.7)', color:'#fff', border:'none', borderRadius:'50%', width:24, height:24, cursor:'pointer', fontSize:14 }}>×</button>
+            </div>
+          )}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:6 }}>
+            {photos.map(p => (
+              <div key={p.id} onClick={() => setSelected(selected?.id === p.id ? null : p)}
+                style={{ cursor:'pointer', borderRadius:8, overflow:'hidden', border: selected?.id === p.id ? '2px solid var(--accent)' : '1px solid var(--b)' }}>
+                <img src={p.photo_url} alt={p.photo_type}
+                  style={{ width:'100%', height:75, objectFit:'cover', display:'block' }} />
+                <div style={{ padding:'3px 5px', fontSize:9, color:'var(--muted)', background:'var(--s2)' }}>
+                  {typeLabel[p.photo_type] || p.photo_type}<br/>
+                  <span style={{ color:'var(--accent)' }}>{p.lock_no}</span> · {p.taken_by?.split(' ')[0]}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
 // ── PRINT DANGER TAG ─────────────────────────────────────────────────────────
 function printDangerTag(info) {
   const now = new Date();
@@ -426,19 +537,20 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
   const [otherReason, setOtherReason] = useState('');
   const [permit, setPermit] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [err, setErr] = useState('');
+  const [photo1, setPhoto1] = useState(null);
+  const [photo2, setPhoto2] = useState(null);
 
   const handleApply = async () => {
     if (!lock) { setErr('Please select a lock.'); return; }
-    setErr(''); setLoading(true);
-    // One lock per type per equipment
+    setErr(''); setLoading(true); setLoadingMsg('Applying lock...');
     const { data: existing } = await db.from('locks').select('id')
       .eq('equipment_id', eq.id).eq('lock_type', lockType).eq('status', 'applied');
     if (existing && existing.length > 0) {
       setErr(`This equipment already has a ${lockType} lock applied.`);
       setLoading(false); return;
     }
-    // Mechanical/electrical require ops lock
     if (lockType !== 'operations') {
       const { data: opsLocks } = await db.from('locks').select('id')
         .eq('equipment_id', eq.id).eq('lock_type', 'operations').eq('status', 'applied');
@@ -461,7 +573,25 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
       by_name: session.full_name, by_id_no: session.id_no,
       reason: finalReason, box_slot: lock.box_slot, action_at: now
     });
-    toast(`Lock ${lock.lock_no} applied to ${eq.tag}`);
+    // Upload photos if provided
+    if (photo1 || photo2) {
+      setLoadingMsg('Uploading photos...');
+      try {
+        const inserts = [];
+        if (photo1) {
+          const url = await uploadLockPhoto(photo1, lock.lock_no, 'on_breaker');
+          inserts.push({ lock_no: lock.lock_no, equipment_id: eq.id, photo_type: 'on_breaker', photo_url: url, taken_by: session.full_name, taken_by_id: session.id_no });
+        }
+        if (photo2) {
+          const url = await uploadLockPhoto(photo2, lock.lock_no, 'key_in_box');
+          inserts.push({ lock_no: lock.lock_no, equipment_id: eq.id, photo_type: 'key_in_box', photo_url: url, taken_by: session.full_name, taken_by_id: session.id_no });
+        }
+        if (inserts.length) await db.from('lock_photos').insert(inserts);
+      } catch (e) {
+        toast('Lock applied — photo upload failed: ' + e.message);
+      }
+    }
+    toast(`Lock ${lock.lock_no} applied to ${eq.tag}${(photo1||photo2) ? ' with photo' : ''}`);
     onApplied({ lock_no: lock.lock_no, eq_tag: eq.tag, id_no: session.id_no, full_name: session.full_name, company: session.company, permit });
     setLoading(false);
   };
@@ -469,8 +599,10 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
   return (
     <Modal title={`Apply ${lockType} Lock — ${eq.tag}`} onClose={onClose}
       footer={<>
-        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        <button className="btn btn-accent" onClick={handleApply} disabled={loading}>{loading ? 'Applying...' : 'Apply Lock'}</button>
+        <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
+        <button className="btn btn-accent" onClick={handleApply} disabled={loading}>
+          {loading ? loadingMsg : 'Apply Lock'}
+        </button>
       </>}>
       {err && <div className="alert alert-danger">{err}</div>}
       <div className="form-group">
@@ -479,19 +611,24 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
       </div>
       <div className="form-group">
         <label className="form-label">Reason</label>
-        <select value={reason} onChange={e => setReason(e.target.value)} style={{ width: '100%' }}>
+        <select value={reason} onChange={e => setReason(e.target.value)} style={{ width:'100%' }}>
           {REASONS.map(r => <option key={r}>{r}</option>)}
         </select>
       </div>
       {reason === 'Other' && (
         <div className="form-group">
           <label className="form-label">Specify reason</label>
-          <input type="text" value={otherReason} onChange={e => setOtherReason(e.target.value)} style={{ width: '100%' }} />
+          <input type="text" value={otherReason} onChange={e => setOtherReason(e.target.value)} style={{ width:'100%' }} />
         </div>
       )}
       <div className="form-group">
         <label className="form-label">Work Permit No. (optional)</label>
-        <input type="text" value={permit} onChange={e => setPermit(e.target.value)} style={{ width: '100%' }} placeholder="e.g. WP-2024-001" />
+        <input type="text" value={permit} onChange={e => setPermit(e.target.value)} style={{ width:'100%' }} placeholder="e.g. WP-2024-001" />
+      </div>
+      <div style={{ borderTop:'1px solid var(--b)', paddingTop:12, marginTop:4 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📷 Photos (optional)</div>
+        <PhotoCapture label="Photo 1 — Lock on Breaker" file={photo1} onFile={setPhoto1} />
+        <PhotoCapture label="Photo 2 — Key in Box Slot" file={photo2} onFile={setPhoto2} />
       </div>
     </Modal>
   );
@@ -500,10 +637,12 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
 // ── REMOVE LOCK MODAL ─────────────────────────────────────────────────────────
 function RemoveLockModal({ lock, equipment: eq, session, onClose, onRemoved }) {
   const [loading, setLoading] = useState(false);
+  const [loadingMsg, setLoadingMsg] = useState('');
   const [err, setErr] = useState('');
+  const [photo, setPhoto] = useState(null);
 
   const handleRemove = async () => {
-    setLoading(true);
+    setLoading(true); setLoadingMsg('Removing lock...');
     if (lock.lock_type === 'operations') {
       const { data: others } = await db.from('locks').select('id')
         .eq('equipment_id', eq.id).in('lock_type', ['mechanical', 'electrical']).eq('status', 'applied');
@@ -524,24 +663,43 @@ function RemoveLockModal({ lock, equipment: eq, session, onClose, onRemoved }) {
       reason: lock.reason, box_slot: lock.box_slot,
       action_at: new Date().toISOString()
     });
-    toast(`Lock ${lock.lock_no} removed from ${eq.tag}`);
+    if (photo) {
+      setLoadingMsg('Uploading photo...');
+      try {
+        const url = await uploadLockPhoto(photo, lock.lock_no, 'on_hook');
+        await db.from('lock_photos').insert({
+          lock_no: lock.lock_no, equipment_id: eq.id,
+          photo_type: 'on_hook', photo_url: url,
+          taken_by: session.full_name, taken_by_id: session.id_no
+        });
+      } catch (e) {
+        toast('Lock removed — photo upload failed: ' + e.message);
+      }
+    }
+    toast(`Lock ${lock.lock_no} removed from ${eq.tag}${photo ? ' with photo' : ''}`);
     onRemoved();
   };
 
   return (
     <Modal title={`Remove ${lock.lock_type} Lock`} onClose={onClose}
       footer={<>
-        <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-        <button className="btn btn-danger" onClick={handleRemove} disabled={loading}>{loading ? 'Removing...' : 'Remove Lock'}</button>
+        <button className="btn btn-ghost" onClick={onClose} disabled={loading}>Cancel</button>
+        <button className="btn btn-danger" onClick={handleRemove} disabled={loading}>
+          {loading ? loadingMsg : 'Remove Lock'}
+        </button>
       </>}>
       {err && <div className="alert alert-danger">{err}</div>}
-      <p style={{ fontSize: 13, marginBottom: 12 }}>
-        Remove lock <strong style={{ color: lockColor(lock.lock_type) }}>{lock.lock_no}</strong> from <strong>{eq.tag} — {eq.name}</strong>?
+      <p style={{ fontSize:13, marginBottom:12 }}>
+        Remove lock <strong style={{ color:lockColor(lock.lock_type) }}>{lock.lock_no}</strong> from <strong>{eq.tag} — {eq.name}</strong>?
       </p>
-      <div className="detail-panel" style={{ fontSize: 12 }}>
+      <div className="detail-panel" style={{ fontSize:12, marginBottom:12 }}>
         <div className="detail-row"><span className="detail-label">Applied By</span><span>{lock.applied_by}</span></div>
         <div className="detail-row"><span className="detail-label">Reason</span><span>{lock.reason}</span></div>
         <div className="detail-row"><span className="detail-label">Work Permit</span><span>{lock.permit || '—'}</span></div>
+      </div>
+      <div style={{ borderTop:'1px solid var(--b)', paddingTop:12 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:'var(--accent)', marginBottom:8 }}>📷 Photo (optional)</div>
+        <PhotoCapture label="Lock returned to Hook" file={photo} onFile={setPhoto} />
       </div>
     </Modal>
   );
@@ -556,6 +714,8 @@ function EquipmentCard({ eq, locks, session, onAction }) {
   const elecLocks = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'electrical'  && l.status === 'applied');
   const myLocks   = myLockType ? locks.filter(l => l.equipment_id === eq.id && l.lock_type === myLockType && l.status === 'applied' && l.applied_id_no === session.id_no) : [];
   const hasMyLock = myLocks.length > 0;
+  const canViewPhotos = ['admin','hse','superintendent','auditor','ops_supervisor','mech_supervisor','elec_supervisor','mech_superintendent','elec_superintendent'].includes(role);
+  const [showPhotos, setShowPhotos] = useState(false);
 
   return (
     <div className="eq-card">
@@ -572,7 +732,10 @@ function EquipmentCard({ eq, locks, session, onAction }) {
         {mechLocks.length > 0 && role !== 'operations' && role !== 'electrical' && <span className="badge badge-blue">MECH: {mechLocks[0].lock_no}</span>}
         {elecLocks.length > 0 && role !== 'operations' && role !== 'mechanical' && <span className="badge badge-red">ELEC: {elecLocks[0].lock_no}</span>}
         {opsLocks.length === 0 && mechLocks.length === 0 && elecLocks.length === 0 && <span className="badge badge-gray">No Locks</span>}
+        {canViewPhotos && <button onClick={() => setShowPhotos(true)}
+          style={{ marginLeft:'auto', background:'none', border:'1px solid var(--b)', borderRadius:6, padding:'2px 8px', fontSize:11, color:'var(--muted)', cursor:'pointer' }}>📷 Photos</button>}
       </div>
+      {showPhotos && <PhotoGallery equipmentId={eq.id} eqTag={eq.tag} onClose={() => setShowPhotos(false)} />}
       {myLockType && !eq.decommissioned && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {!hasMyLock && (
@@ -1028,7 +1191,7 @@ function SuperLocks({ locks, equipment, onRefresh }) {
       <div className="card">
         <div className="section-header"><div className="card-title" style={{ margin: 0 }}>Box Slot Visualization (8×8)</div></div>
         <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 8 }}>Columns A–H, Rows 1–8 | 🔒 = applied, color = lock type</div>
-        <div className="box-grid">
+        <div className="box-grid-8">
           {BOX_SLOTS.map(slot => {
             const applied = locks.find(l => l.box_slot === slot && l.status === 'applied');
             const avail   = locks.find(l => l.box_slot === slot && l.status === 'available');
@@ -1968,6 +2131,9 @@ function App() {
       {session.role === 'operations'           && <OperationsApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {(session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {!['admin','hse','superintendent','auditor','ops_supervisor','operations','mech_superintendent','mech_supervisor','mechanical','elec_superintendent','elec_supervisor','electrical'].includes(session.role) && (
+        <div className="main"><div className="alert alert-danger">Unknown role "{session.role}". Please sign out and log in again.</div></div>
+      )}
       <Toasts />
     </>
   );
