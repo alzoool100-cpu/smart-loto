@@ -105,6 +105,13 @@ tr:last-child td{border-bottom:none}
 .box-grid-5{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:8px}
 .box-slot{aspect-ratio:1;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;font-weight:700;border:1px solid var(--b);background:var(--s2);transition:all .2s;position:relative;min-height:44px}
 .box-slot-label{font-size:8px;color:var(--muted);position:absolute;top:2px;left:0;right:0;text-align:center}
+.box-slot-pick{cursor:pointer}.box-slot-pick:hover{transform:scale(1.08);z-index:2}
+.box-slot-selected{border-width:3px!important;box-shadow:0 0 8px rgba(0,201,167,.5)}
+.alert-banner{border-radius:10px;padding:12px 16px;margin:8px 16px;display:flex;align-items:flex-start;gap:10px;font-size:13px;animation:fadein .3s}
+.alert-banner-yellow{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.5);color:#fcd34d}
+.alert-banner-orange{background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.5);color:#fdba74}
+.alert-banner-red{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.5);color:#fca5a5}
+.alert-banners-wrap{display:flex;flex-direction:column;gap:6px;padding:8px 0 0}
 .hooks-board{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
 .hook{width:48px;height:56px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px solid rgba(255,255,255,.1);font-size:9px;font-weight:700;background:var(--s2)}
 .hook.ops{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.4);color:#22c55e}
@@ -264,15 +271,16 @@ function getBoxSlots(lockType) {
 }
 
 // ── BOX VIEW (reusable) ───────────────────────────────────────────────────────
-function BoxView({ lockType, locks }) {
-  const cfg   = BOX_CONFIG[lockType] || BOX_CONFIG.operations;
-  const slots = getBoxSlots(lockType);
-  const cols  = cfg.cols.length;
-  const color = lockColor(lockType);
+function BoxView({ lockType, locks, equipment }) {
+  const cfg    = BOX_CONFIG[lockType] || BOX_CONFIG.operations;
+  const slots  = getBoxSlots(lockType);
+  const cols   = cfg.cols.length;
+  const color  = lockColor(lockType);
+  const [popup, setPopup] = useState(null);
   const bySlot = {};
   locks.filter(l => l.lock_type === lockType && l.status === 'applied' && l.box_slot)
        .forEach(l => { bySlot[l.box_slot] = l; });
-  const applied  = locks.filter(l => l.lock_type === lockType && l.status === 'applied').length;
+  const applied   = locks.filter(l => l.lock_type === lockType && l.status === 'applied').length;
   const available = locks.filter(l => l.lock_type === lockType && l.status === 'available').length;
   const label = lockType.charAt(0).toUpperCase() + lockType.slice(1);
   const size  = `${cols}×${cfg.rows}`;
@@ -283,14 +291,16 @@ function BoxView({ lockType, locks }) {
         <span style={{ fontSize:11, color:'var(--muted)' }}>
           🔒 {applied} applied &nbsp;|&nbsp; 🔓 {available} available
         </span>
+        <span style={{ fontSize:10, color:'var(--muted)' }}>• tap occupied slot for details</span>
       </div>
       <div className={`box-grid-${cols}`}>
         {slots.map(slot => {
           const lk = bySlot[slot];
           return (
-            <div key={slot} className="box-slot"
-              style={{ borderColor: lk ? color : 'var(--b)', background: lk ? `${color}22` : 'var(--s2)', borderWidth: lk ? 2 : 1 }}
-              title={lk ? `${lk.lock_no} — key for lock on breaker` : `Slot ${slot} — empty`}>
+            <div key={slot} className={`box-slot${lk ? ' box-slot-pick' : ''}`}
+              onClick={() => lk && setPopup(popup?.id === lk.id ? null : lk)}
+              style={{ borderColor: lk ? color : 'var(--b)', background: popup?.id === lk?.id ? `${color}44` : lk ? `${color}22` : 'var(--s2)', borderWidth: lk ? 2 : 1 }}
+              title={lk ? `${lk.lock_no} — tap for details` : `Slot ${slot} — empty`}>
               <div className="box-slot-label">{slot}</div>
               {lk && <span style={{ fontSize:8, fontWeight:800, color, marginTop:10 }}>{lk.lock_no}</span>}
               {lk && <span style={{ fontSize:7 }}>🔑</span>}
@@ -298,6 +308,118 @@ function BoxView({ lockType, locks }) {
           );
         })}
       </div>
+      {popup && (() => {
+        const eq = equipment && equipment.find(e => e.id === popup.equipment_id);
+        const hrs = popup.applied_at ? ((Date.now() - new Date(popup.applied_at)) / 3600000).toFixed(1) : null;
+        const expectedAt = popup.expected_done_at ? new Date(popup.expected_done_at) : null;
+        return (
+          <div style={{ marginTop:10, background:'var(--s2)', border:`1px solid ${color}`, borderRadius:10, padding:12, fontSize:12, position:'relative', animation:'fadein .2s' }}>
+            <button onClick={() => setPopup(null)} style={{ position:'absolute', top:6, right:8, background:'none', border:'none', color:'var(--muted)', cursor:'pointer', fontSize:16 }}>×</button>
+            <div style={{ fontWeight:800, color, marginBottom:6 }}>🔑 Slot {popup.box_slot} — {popup.lock_no}</div>
+            {eq && <div><span style={{ color:'var(--muted)' }}>Equipment:</span> <strong>{eq.tag}</strong> — {eq.name}</div>}
+            {eq && <div style={{ color:'var(--muted)', fontSize:11 }}>{eq.plant} → {eq.mcc_room} → {eq.rack}</div>}
+            <div><span style={{ color:'var(--muted)' }}>Applied by:</span> {popup.applied_by} <span style={{ color:'var(--muted)' }}>({popup.applied_id_no})</span></div>
+            <div><span style={{ color:'var(--muted)' }}>Reason:</span> {popup.reason || '—'}</div>
+            {popup.permit && <div><span style={{ color:'var(--muted)' }}>Permit:</span> {popup.permit}</div>}
+            {hrs && <div><span style={{ color:'var(--muted)' }}>Duration:</span> <span style={{ color: Number(hrs) > 24 ? '#ef4444' : '#22c55e', fontWeight:700 }}>{hrs}h</span></div>}
+            {expectedAt && <div><span style={{ color:'var(--muted)' }}>Expected done:</span> {expectedAt.toLocaleString()}</div>}
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
+// ── BOX SLOT PICKER (for apply modal) ────────────────────────────────────────
+function BoxSlotPicker({ lockType, locks, selected, onSelect }) {
+  const cfg   = BOX_CONFIG[lockType] || BOX_CONFIG.operations;
+  const slots = getBoxSlots(lockType);
+  const cols  = cfg.cols.length;
+  const color = lockColor(lockType);
+  const bySlot = {};
+  locks.filter(l => l.lock_type === lockType && l.status === 'applied' && l.box_slot)
+       .forEach(l => { bySlot[l.box_slot] = l; });
+  return (
+    <div>
+      <div style={{ fontSize:11, color:'var(--muted)', marginBottom:6 }}>
+        🟢 Empty — click to select &nbsp;|&nbsp; 🔴 Occupied (already has a key)
+      </div>
+      <div className={`box-grid-${cols}`}>
+        {slots.map(slot => {
+          const occupied = bySlot[slot];
+          const isSel = selected === slot;
+          return (
+            <div key={slot}
+              className={`box-slot box-slot-pick${isSel ? ' box-slot-selected' : ''}`}
+              onClick={() => !occupied && onSelect(isSel ? null : slot)}
+              style={{
+                borderColor: isSel ? 'var(--accent)' : occupied ? color : 'var(--b)',
+                background:  isSel ? 'rgba(0,201,167,.25)' : occupied ? `${color}22` : 'var(--s2)',
+                cursor: occupied ? 'not-allowed' : 'pointer',
+                borderWidth: isSel ? 3 : occupied ? 2 : 1,
+              }}
+              title={occupied ? `Occupied: ${occupied.lock_no} (${occupied.applied_by})` : isSel ? `Selected: ${slot}` : `Slot ${slot} — click to place key here`}>
+              <div className="box-slot-label">{slot}</div>
+              {occupied && <span style={{ fontSize:8, color, fontWeight:800 }}>{occupied.lock_no}</span>}
+              {occupied && <span style={{ fontSize:7 }}>🔒</span>}
+              {!occupied && isSel && <span style={{ fontSize:10, color:'var(--accent)' }}>✓</span>}
+              {!occupied && !isSel && <span style={{ fontSize:7, color:'var(--muted)' }}>○</span>}
+            </div>
+          );
+        })}
+      </div>
+      {selected
+        ? <div style={{ fontSize:11, color:'var(--accent)', marginTop:6, fontWeight:700 }}>✓ Key will go in slot {selected}</div>
+        : <div style={{ fontSize:11, color:'var(--warn)', marginTop:6 }}>⚠ Please select a slot for the key</div>}
+    </div>
+  );
+}
+
+// ── BOX SEARCH ────────────────────────────────────────────────────────────────
+function BoxSearch({ lockType, locks, equipment }) {
+  const [q, setQ] = useState('');
+  const [field, setField] = useState('all');
+  const color = lockColor(lockType);
+  const applied = locks.filter(l => l.lock_type === lockType && l.status === 'applied');
+  const results = q.trim() === '' ? [] : applied.filter(l => {
+    const eq = equipment && equipment.find(e => e.id === l.equipment_id);
+    const term = q.toLowerCase();
+    if (field === 'lock_no')    return l.lock_no?.toLowerCase().includes(term);
+    if (field === 'eq_tag')     return eq?.tag?.toLowerCase().includes(term) || eq?.name?.toLowerCase().includes(term);
+    if (field === 'applied_by') return l.applied_by?.toLowerCase().includes(term);
+    if (field === 'slot')       return l.box_slot?.toLowerCase().includes(term);
+    return [l.lock_no, eq?.tag, eq?.name, l.applied_by, l.box_slot].some(v => v?.toLowerCase().includes(term));
+  });
+  return (
+    <div>
+      <div style={{ display:'flex', gap:8, marginBottom:10, flexWrap:'wrap' }}>
+        <select value={field} onChange={e => setField(e.target.value)} style={{ fontSize:12 }}>
+          <option value="all">All Fields</option>
+          <option value="eq_tag">Equipment Tag/Name</option>
+          <option value="lock_no">Lock Number</option>
+          <option value="applied_by">Applied By</option>
+          <option value="slot">Box Slot</option>
+        </select>
+        <input type="text" value={q} onChange={e => setQ(e.target.value)}
+          placeholder="Search..." style={{ flex:1, minWidth:140 }} />
+        {q && <button className="btn btn-ghost btn-sm" onClick={() => setQ('')}>✕ Clear</button>}
+      </div>
+      {q.trim() !== '' && results.length === 0 && <div className="empty">No results for "{q}"</div>}
+      {results.map(l => {
+        const eq = equipment && equipment.find(e => e.id === l.equipment_id);
+        const hrs = l.applied_at ? ((Date.now() - new Date(l.applied_at)) / 3600000).toFixed(1) : null;
+        return (
+          <div key={l.id} style={{ background:'var(--s2)', border:`1px solid ${color}44`, borderRadius:9, padding:11, marginBottom:7, fontSize:12 }}>
+            <div style={{ display:'flex', justifyContent:'space-between', flexWrap:'wrap', gap:4, marginBottom:4 }}>
+              <span style={{ fontWeight:800, color }}>🔑 Slot {l.box_slot || '?'} — {l.lock_no}</span>
+              {hrs && <span style={{ color: Number(hrs) > 24 ? '#ef4444' : '#22c55e', fontWeight:700, fontSize:11 }}>{hrs}h ago</span>}
+            </div>
+            {eq && <div><strong>{eq.tag}</strong> — {eq.name}</div>}
+            {eq && <div style={{ color:'var(--muted)', fontSize:11 }}>{eq.plant} → {eq.mcc_room} → {eq.rack}</div>}
+            <div style={{ color:'var(--muted)' }}>By: {l.applied_by} | Reason: {l.reason || '—'} {l.permit ? `| Permit: ${l.permit}` : ''}</div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -531,8 +653,10 @@ function LockPicker({ lockType, onSelect, selected }) {
 }
 
 // ── APPLY LOCK MODAL ──────────────────────────────────────────────────────────
-function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }) {
+function ApplyLockModal({ equipment: eq, session, lockType, locks, onClose, onApplied }) {
   const [lock, setLock] = useState(null);
+  const [boxSlot, setBoxSlot] = useState(null);
+  const [expectedHours, setExpectedHours] = useState('');
   const [reason, setReason] = useState('Routine Maintenance');
   const [otherReason, setOtherReason] = useState('');
   const [permit, setPermit] = useState('');
@@ -544,6 +668,7 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
 
   const handleApply = async () => {
     if (!lock) { setErr('Please select a lock.'); return; }
+    if (!boxSlot) { setErr('Please select a box slot for the key.'); return; }
     setErr(''); setLoading(true); setLoadingMsg('Applying lock...');
     const { data: existing } = await db.from('locks').select('id')
       .eq('equipment_id', eq.id).eq('lock_type', lockType).eq('status', 'applied');
@@ -561,10 +686,14 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
     }
     const finalReason = reason === 'Other' ? (otherReason || 'Other') : reason;
     const now = new Date().toISOString();
+    const expectedDoneAt = expectedHours ? new Date(Date.now() + Number(expectedHours) * 3600000).toISOString() : null;
     const { error } = await db.from('locks').update({
       status: 'applied', equipment_id: eq.id,
       applied_by: session.full_name, applied_id_no: session.id_no,
-      reason: finalReason, permit, applied_at: now
+      reason: finalReason, permit, applied_at: now,
+      box_slot: boxSlot,
+      expected_hours: expectedHours ? Number(expectedHours) : null,
+      expected_done_at: expectedDoneAt,
     }).eq('id', lock.id);
     if (error) { setErr('Failed: ' + error.message); setLoading(false); return; }
     await db.from('audit_log').insert({
@@ -608,6 +737,25 @@ function ApplyLockModal({ equipment: eq, session, lockType, onClose, onApplied }
       <div className="form-group">
         <label className="form-label">Select {lockType} lock</label>
         <LockPicker lockType={lockType} onSelect={setLock} selected={lock} />
+      </div>
+      <div className="form-group" style={{ borderTop:'1px solid var(--b)', paddingTop:12 }}>
+        <label className="form-label">📦 Select Key Box Slot <span style={{ color:'var(--danger)' }}>*</span></label>
+        <BoxSlotPicker lockType={lockType} locks={locks} selected={boxSlot} onSelect={setBoxSlot} />
+      </div>
+      <div className="form-group" style={{ borderTop:'1px solid var(--b)', paddingTop:12 }}>
+        <label className="form-label">⏱ Expected Completion Time (optional)</label>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          {['','1','2','3','4','6','8','12'].map(h => (
+            <button key={h} type="button"
+              className={`btn btn-sm ${expectedHours === h && h !== '' ? 'btn-accent' : 'btn-ghost'}`}
+              onClick={() => setExpectedHours(h)}>
+              {h === '' ? 'Not set' : `${h}h`}
+            </button>
+          ))}
+        </div>
+        {expectedHours && <div style={{ fontSize:11, color:'var(--accent)', marginTop:5 }}>
+          Alert 30 min before: {new Date(Date.now() + Number(expectedHours) * 3600000 - 1800000).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}
+        </div>}
       </div>
       <div className="form-group">
         <label className="form-label">Reason</label>
@@ -794,7 +942,7 @@ function SearchEquipmentTab({ session, equipment, locks, onRefresh }) {
         </div>
       </div>
       {applyModal && (
-        <ApplyLockModal equipment={applyModal} session={session} lockType={roleLockType(session.role)}
+        <ApplyLockModal equipment={applyModal} session={session} lockType={roleLockType(session.role)} locks={locks}
           onClose={() => setApplyModal(null)}
           onApplied={info => { setLastApplied(info); setApplyModal(null); onRefresh(); }} />
       )}
@@ -817,12 +965,16 @@ function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <div className="card">
           <div className="card-title">📦 Operations Box (8×8)</div>
-          <BoxView lockType="operations" locks={locks} />
+          <BoxView lockType="operations" locks={locks} equipment={equipment} />
         </div>
         <div className="card">
           <div className="card-title">🪝 Operations Hooks</div>
           <HooksView lockType="operations" locks={locks} />
         </div>
+      </div>
+      <div className="card">
+        <div className="card-title">🔍 Search Box Keys</div>
+        <BoxSearch lockType="operations" locks={locks} equipment={equipment} />
       </div>
       <div className="card">
         <div className="card-title">My Applied Locks ({myLocks.length})</div>
@@ -892,7 +1044,7 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <div className="card">
           <div className="card-title">📦 {myLockType.charAt(0).toUpperCase()+myLockType.slice(1)} Box (5×5)</div>
-          <BoxView lockType={myLockType} locks={locks} />
+          <BoxView lockType={myLockType} locks={locks} equipment={equipment} />
         </div>
         <div className="card">
           <div className="card-title">🪝 {myLockType.charAt(0).toUpperCase()+myLockType.slice(1)} Hooks</div>
@@ -948,7 +1100,7 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
         </div>
       )}
       {applyModal && (
-        <ApplyLockModal equipment={applyModal} session={session} lockType={myLockType}
+        <ApplyLockModal equipment={applyModal} session={session} lockType={myLockType} locks={locks}
           onClose={() => setApplyModal(null)}
           onApplied={info => { setLastApplied(info); setApplyModal(null); onRefresh(); }} />
       )}
@@ -1618,6 +1770,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
     { id: 'mcc',       label: 'MCC Rooms' },
     { id: 'reports',   label: 'Reports' },
     { id: 'personnel', label: 'Personnel' },
+    { id: 'shifts',    label: '⏰ Shifts' },
   ];
   return (
     <>
@@ -1630,6 +1783,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
       {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
       {tab === 'reports'   && <SuperReports session={session} />}
       {tab === 'personnel' && <SuperPersonnel />}
+      {tab === 'shifts'    && <ShiftSettingsTab />}
     </>
   );
 }
@@ -1699,7 +1853,7 @@ function DeptSuperintendentApp({ session, equipment, locks }) {
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
             <div className="card">
               <div className="card-title">📦 {label} Box ({boxSize})</div>
-              <BoxView lockType={lockType} locks={locks} />
+              <BoxView lockType={lockType} locks={locks} equipment={equipment} />
             </div>
             <div className="card">
               <div className="card-title">🪝 {label} Hooks Board</div>
@@ -1769,7 +1923,7 @@ function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <div className="card">
           <div className="card-title">📦 Operations Box (8×8)</div>
-          <BoxView lockType="operations" locks={locks} />
+          <BoxView lockType="operations" locks={locks} equipment={equipment} />
         </div>
         <div className="card">
           <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6, flexWrap:'wrap', gap:8 }}>
@@ -1833,7 +1987,7 @@ function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <div className="card">
           <div className="card-title">📦 {lockType.charAt(0).toUpperCase()+lockType.slice(1)} Box (5×5)</div>
-          <BoxView lockType={lockType} locks={locks} />
+          <BoxView lockType={lockType} locks={locks} equipment={equipment} />
         </div>
         <div className="card">
           <div className="card-title">🪝 Team Hooks Board</div>
@@ -2053,14 +2207,238 @@ function SetPasswordScreen({ user, onDone }) {
   );
 }
 
+// ── ALERT BANNER ─────────────────────────────────────────────────────────────
+const OVERDUE_ROLES = ['admin','hse','superintendent','auditor','mech_superintendent','elec_superintendent'];
+const SUPERVISOR_ROLES = ['ops_supervisor','mech_supervisor','elec_supervisor'];
+
+function AlertBanner({ session, locks, equipment, shiftConfig }) {
+  const [dismissed, setDismissed] = useState({});
+  const [extendId, setExtendId] = useState(null);
+  const [extendHours, setExtendHours] = useState('2');
+  const [statusModal, setStatusModal] = useState(null);
+  const [statusChoice, setStatusChoice] = useState('');
+  const [statusNote, setStatusNote] = useState('');
+  const now = Date.now();
+  const alerts = [];
+
+  // Type 1 — expected time (30 min before, for the technician who applied)
+  locks.filter(l => l.status === 'applied' && l.applied_id_no === session.id_no && l.expected_done_at).forEach(l => {
+    const msLeft = new Date(l.expected_done_at) - now;
+    if (msLeft <= 30 * 60000 && msLeft > -90 * 60000 && !dismissed[`exp_${l.id}`]) {
+      const eq = equipment.find(e => e.id === l.equipment_id);
+      alerts.push({ kind: 'expected', lock: l, eq, msLeft, key: `exp_${l.id}` });
+    }
+  });
+
+  // Type 2 — overdue 24h (for senior roles)
+  if (OVERDUE_ROLES.includes(session.role)) {
+    locks.filter(l => l.status === 'applied' && l.applied_at).forEach(l => {
+      const hrs = (now - new Date(l.applied_at)) / 3600000;
+      if (hrs > 24 && !dismissed[`ov_${l.id}`]) {
+        const eq = equipment.find(e => e.id === l.equipment_id);
+        alerts.push({ kind: 'overdue', lock: l, eq, hrs, key: `ov_${l.id}` });
+      }
+    });
+  }
+
+  // Type 3 — shift end (30 min before, for supervisors)
+  if (SUPERVISOR_ROLES.includes(session.role) && session.shift && shiftConfig.length > 0 && !dismissed['shift_end']) {
+    const cfg = shiftConfig.find(s => s.shift_name === session.shift);
+    if (cfg) {
+      const [eh, em] = cfg.end_time.split(':').map(Number);
+      const shiftEnd = new Date(); shiftEnd.setHours(eh, em, 0, 0);
+      let msToEnd = shiftEnd - now;
+      if (msToEnd < -12 * 3600000) msToEnd += 24 * 3600000;
+      if (msToEnd <= 30 * 60000 && msToEnd > -30 * 60000) {
+        const lt = roleLockType(session.role);
+        const myActive = locks.filter(l => l.status === 'applied' && l.lock_type === lt);
+        if (myActive.length > 0) alerts.push({ kind: 'shift_end', locks: myActive, msToEnd, key: 'shift_end' });
+      }
+    }
+  }
+
+  if (alerts.length === 0) return null;
+
+  const dismiss = key => setDismissed(d => ({ ...d, [key]: true }));
+
+  const handleExtend = async () => {
+    const l = alerts.find(a => a.key === `exp_${extendId}`)?.lock;
+    if (!l) return;
+    const newDone = new Date(new Date(l.expected_done_at).getTime() + Number(extendHours) * 3600000).toISOString();
+    await db.from('locks').update({ expected_done_at: newDone, expected_hours: (l.expected_hours || 0) + Number(extendHours) }).eq('id', l.id);
+    setExtendId(null); dismiss(`exp_${l.id}`);
+    toast(`Extended by ${extendHours}h`);
+  };
+
+  const handleStatus = async () => {
+    if (!statusChoice) return;
+    const l = statusModal;
+    const note = statusChoice === 'other' ? statusNote : statusChoice === 'done' ? 'Work completed' : 'Work not completed';
+    await db.from('audit_log').insert({ action: 'STATUS_UPDATE', lock_no: l.lock_no, lock_type: l.lock_type, by_name: session.full_name, by_id_no: session.id_no, reason: note, action_at: new Date().toISOString() });
+    dismiss(`exp_${l.id}`); setStatusModal(null); setStatusChoice(''); setStatusNote('');
+    toast('Status updated');
+  };
+
+  return (
+    <div className="alert-banners-wrap">
+      {alerts.map(a => {
+        if (a.kind === 'expected') {
+          const mins = Math.round(a.msLeft / 60000);
+          return (
+            <div key={a.key} className="alert-banner alert-banner-yellow">
+              <span style={{ fontSize:20 }}>⏰</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:800, marginBottom:3 }}>
+                  {mins > 0 ? `${mins} min until expected completion` : 'Expected completion time passed'}
+                </div>
+                <div style={{ fontSize:12 }}>Lock <strong>{a.lock.lock_no}</strong>{a.eq ? ` on ${a.eq.tag} — ${a.eq.name}` : ''}</div>
+                <div style={{ display:'flex', gap:6, marginTop:8, flexWrap:'wrap' }}>
+                  <button className="btn btn-sm" style={{ background:'#22c55e', color:'#000' }} onClick={() => setStatusModal(a.lock)}>Update Status</button>
+                  <button className="btn btn-sm btn-ghost" onClick={() => setExtendId(a.lock.id)}>⏱ Extend Time</button>
+                  <button className="btn btn-sm btn-ghost" onClick={() => dismiss(a.key)}>Dismiss</button>
+                </div>
+                {extendId === a.lock.id && (
+                  <div style={{ display:'flex', gap:6, marginTop:6, flexWrap:'wrap', alignItems:'center' }}>
+                    <span style={{ fontSize:12 }}>Add:</span>
+                    {['1','2','3','4'].map(h => (
+                      <button key={h} className={`btn btn-sm ${extendHours === h ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setExtendHours(h)}>{h}h</button>
+                    ))}
+                    <button className="btn btn-sm btn-accent" onClick={handleExtend}>Confirm</button>
+                    <button className="btn btn-sm btn-ghost" onClick={() => setExtendId(null)}>Cancel</button>
+                  </div>
+                )}
+              </div>
+              <button onClick={() => dismiss(a.key)} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', fontSize:18, alignSelf:'flex-start' }}>×</button>
+            </div>
+          );
+        }
+        if (a.kind === 'overdue') {
+          return (
+            <div key={a.key} className="alert-banner alert-banner-red">
+              <span style={{ fontSize:20 }}>🚨</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:800, marginBottom:3 }}>Lock overdue — {a.hrs.toFixed(0)}h applied</div>
+                <div style={{ fontSize:12 }}>
+                  Lock <strong>{a.lock.lock_no}</strong>{a.eq ? ` on ${a.eq.tag} — ${a.eq.name}` : ''} — Applied by {a.lock.applied_by}
+                </div>
+              </div>
+              <button onClick={() => dismiss(a.key)} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', fontSize:18, alignSelf:'flex-start' }}>×</button>
+            </div>
+          );
+        }
+        if (a.kind === 'shift_end') {
+          const mins = Math.round(a.msToEnd / 60000);
+          return (
+            <div key={a.key} className="alert-banner alert-banner-orange">
+              <span style={{ fontSize:20 }}>🔔</span>
+              <div style={{ flex:1 }}>
+                <div style={{ fontWeight:800, marginBottom:3 }}>
+                  Shift ending in {mins > 0 ? `${mins} min` : 'now'} — {a.locks.length} active lock{a.locks.length > 1 ? 's' : ''}
+                </div>
+                <div style={{ fontSize:12 }}>{a.locks.map(l => l.lock_no).join(', ')}</div>
+              </div>
+              <button onClick={() => dismiss(a.key)} style={{ background:'none', border:'none', color:'inherit', cursor:'pointer', fontSize:18, alignSelf:'flex-start' }}>×</button>
+            </div>
+          );
+        }
+        return null;
+      })}
+      {statusModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth:360 }}>
+            <div className="modal-header"><div className="modal-title">🔔 Lock Status Update</div></div>
+            <div className="modal-body">
+              <div style={{ marginBottom:8, fontSize:13 }}>Lock <strong>{statusModal.lock_no}</strong> — What is the current status?</div>
+              {[
+                { val:'done',        label:'✅ Work completed — ready to remove lock' },
+                { val:'not_done',    label:'❌ Work not completed — still in progress' },
+                { val:'other',       label:'📝 Other reason' },
+              ].map(opt => (
+                <label key={opt.val} style={{ display:'flex', alignItems:'center', gap:8, padding:'8px 0', cursor:'pointer', fontSize:13, borderBottom:'1px solid var(--b)' }}>
+                  <input type="radio" name="status" value={opt.val} checked={statusChoice === opt.val} onChange={() => setStatusChoice(opt.val)} />
+                  {opt.label}
+                </label>
+              ))}
+              {statusChoice === 'other' && (
+                <textarea value={statusNote} onChange={e => setStatusNote(e.target.value)}
+                  placeholder="Describe the reason..." rows={3}
+                  style={{ width:'100%', marginTop:8, resize:'vertical' }} />
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => { setStatusModal(null); setStatusChoice(''); }}>Cancel</button>
+              <button className="btn btn-accent" onClick={handleStatus} disabled={!statusChoice || (statusChoice === 'other' && !statusNote.trim())}>Submit</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── SHIFT SETTINGS TAB (Admin) ────────────────────────────────────────────────
+function ShiftSettingsTab() {
+  const [config, setConfig] = useState([]);
+  const [saving, setSaving] = useState(null);
+  const [edited, setEdited] = useState({});
+  useEffect(() => {
+    db.from('shift_config').select('*').order('shift_name').then(({ data }) => {
+      setConfig(data || []);
+      const e = {};
+      (data || []).forEach(s => { e[s.id] = { start_time: s.start_time, end_time: s.end_time }; });
+      setEdited(e);
+    });
+  }, []);
+  const save = async (id) => {
+    setSaving(id);
+    const { start_time, end_time } = edited[id];
+    await db.from('shift_config').update({ start_time, end_time }).eq('id', id);
+    setSaving(null); toast('Shift times saved');
+  };
+  return (
+    <div className="main">
+      <div className="card">
+        <div className="card-title">⏰ Shift Schedule Settings</div>
+        <table>
+          <thead><tr><th>Shift Name</th><th>Start Time</th><th>End Time</th><th>Action</th></tr></thead>
+          <tbody>
+            {config.map(s => (
+              <tr key={s.id}>
+                <td style={{ fontWeight:700 }}>{s.shift_name}</td>
+                <td>
+                  <input type="time" value={edited[s.id]?.start_time || s.start_time}
+                    onChange={e => setEdited(d => ({ ...d, [s.id]: { ...d[s.id], start_time: e.target.value } }))}
+                    style={{ width:110 }} />
+                </td>
+                <td>
+                  <input type="time" value={edited[s.id]?.end_time || s.end_time}
+                    onChange={e => setEdited(d => ({ ...d, [s.id]: { ...d[s.id], end_time: e.target.value } }))}
+                    style={{ width:110 }} />
+                </td>
+                <td>
+                  <button className="btn btn-accent btn-sm" onClick={() => save(s.id)} disabled={saving === s.id}>
+                    {saving === s.id ? 'Saving...' : 'Save'}
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 function App() {
   const [session, setSession]       = useState(null);
   const [pendingUser, setPendingUser] = useState(null);
   const [equipment, setEquipment]   = useState([]);
   const [locks, setLocks]           = useState([]);
+  const [shiftConfig, setShiftConfig] = useState([]);
   const [loading, setLoading]       = useState(true);
   const timerRef = useRef(null);
+  const alertTimerRef = useRef(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('loto_session');
@@ -2080,6 +2458,7 @@ function App() {
   useEffect(() => {
     if (!session) return;
     fetchData();
+    db.from('shift_config').select('*').then(({ data }) => setShiftConfig(data || []));
     timerRef.current = setInterval(fetchData, 30000);
     return () => clearInterval(timerRef.current);
   }, [session, fetchData]);
@@ -2123,6 +2502,7 @@ function App() {
           <button className="btn btn-ghost btn-sm" onClick={handleLogout}>Sign Out</button>
         </div>
       </nav>
+      <AlertBanner session={session} locks={locks} equipment={equipment} shiftConfig={shiftConfig} />
       {session.role === 'admin'               && <SupervisorApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
       {isViewOnly(session.role)                && <ReadOnlyApp          session={session} equipment={equipment} locks={locks} />}
       {isDeptSuperintendent(session.role)      && <DeptSuperintendentApp session={session} equipment={equipment} locks={locks} />}
