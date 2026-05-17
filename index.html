@@ -2650,6 +2650,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
     { id: 'equipment', label: 'Equipment' },
     { id: 'locks',     label: 'Locks' },
     { id: 'mcc',       label: 'MCC Rooms' },
+    { id: 'findings',  label: '🚩 Findings' },
     { id: 'reports',   label: '📋 Reports' },
     { id: 'personnel', label: 'Personnel' },
     { id: 'shifts',    label: '⏰ Shifts' },
@@ -2664,6 +2665,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
       {tab === 'equipment' && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'locks'     && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
+      {tab === 'findings'  && <SupervisorFindingsTab session={session} equipment={equipment} />}
       {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
       {tab === 'personnel' && <SuperPersonnel />}
       {tab === 'shifts'    && <ShiftSettingsTab />}
@@ -2694,13 +2696,15 @@ function MechElecApp({ session, equipment, locks, onRefresh }) {
   return (
     <>
       <div className="tabs">
-        {isSup && <button className={`tab ${tab==='all'   ?'on':''}`} onClick={() => setTab('all')}>Team Locks</button>}
+        {isSup && <button className={`tab ${tab==='all'      ?'on':''}`} onClick={() => setTab('all')}>Team Locks</button>}
         <button className={`tab ${tab === 'smart'  ? 'on' : ''}`} onClick={() => setTab('smart')}>Smart List</button>
         <button className={`tab ${tab === 'search' ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
+        {isSup && <button className={`tab ${tab==='findings' ?'on':''}`} onClick={() => setTab('findings')}>🚩 Findings</button>}
       </div>
-      {tab === 'all'    && <AllTypedLocksTab   lockType={myLockType} session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'smart'  && <SmartListTab        session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'search' && <SearchEquipmentTab  session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'all'      && <AllTypedLocksTab   lockType={myLockType} session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'smart'    && <SmartListTab        session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'search'   && <SearchEquipmentTab  session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
     </>
   );
 }
@@ -2922,26 +2926,26 @@ function OpsSupervisorApp({ session, equipment, locks, onRefresh }) {
   return (
     <>
       <div className="tabs">
-        <button className={`tab ${tab==='all'   ?'on':''}`} onClick={() => setTab('all')}>All Ops Locks</button>
-        <button className={`tab ${tab==='my'    ?'on':''}`} onClick={() => setTab('my')}>My Locks</button>
-        <button className={`tab ${tab==='search'?'on':''}`} onClick={() => setTab('search')}>Search Equipment</button>
+        <button className={`tab ${tab==='all'      ?'on':''}`} onClick={() => setTab('all')}>All Ops Locks</button>
+        <button className={`tab ${tab==='my'       ?'on':''}`} onClick={() => setTab('my')}>My Locks</button>
+        <button className={`tab ${tab==='search'   ?'on':''}`} onClick={() => setTab('search')}>Search Equipment</button>
+        <button className={`tab ${tab==='findings' ?'on':''}`} onClick={() => setTab('findings')}>🚩 Findings</button>
       </div>
-      {tab === 'all'    && <AllOpsLocksTab    session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'my'     && <OpsMyLocksTab     session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'search' && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'all'      && <AllOpsLocksTab    session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'my'       && <OpsMyLocksTab     session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'search'   && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {tab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
     </>
   );
 }
 
-// ── READ-ONLY APP (HSE / SUPERINTENDENT / AUDITOR) ────────────────────────────
+// ── READ-ONLY APP (HSE / SUPERINTENDENT) ─────────────────────────────────────
 function ReadOnlyApp({ session, equipment, locks }) {
   const [tab, setTab] = useState('dashboard');
-  const isAuditor = session.role === 'auditor';
   const TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
     { id: 'plantmap',  label: '🗺 Plant Map' },
     { id: 'reports',   label: '📋 Reports' },
-    ...(isAuditor ? [{ id: 'audit', label: '🔍 Audit Log' }] : []),
   ];
   return (
     <>
@@ -2951,7 +2955,6 @@ function ReadOnlyApp({ session, equipment, locks }) {
       {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
       {tab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
       {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
-      {tab === 'audit'     && <AuditLogReadOnly />}
     </>
   );
 }
@@ -3389,6 +3392,7 @@ function App() {
       </nav>
       <AlertBanner session={session} locks={locks} equipment={equipment} shiftConfig={shiftConfig} />
       {session.role === 'admin'               && <SupervisorApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {session.role === 'auditor'             && <AuditorApp           session={session} equipment={equipment} locks={locks} />}
       {isViewOnly(session.role)                && <ReadOnlyApp          session={session} equipment={equipment} locks={locks} />}
       {isDeptSuperintendent(session.role)      && <DeptSuperintendentApp session={session} equipment={equipment} locks={locks} />}
       {session.role === 'ops_supervisor'       && <OpsSupervisorApp     session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
