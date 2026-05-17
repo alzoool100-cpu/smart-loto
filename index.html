@@ -158,7 +158,8 @@ tr:last-child td{border-bottom:none}
 .ovr-x{overflow-x:auto}
 @media print{
   body>*:not(#danger-tag){display:none!important}
-  #danger-tag{display:block!important;position:fixed;top:0;left:0;width:80mm;background:#fff;color:#000;font-family:'Courier New',monospace;padding:4mm}
+  #danger-tag{display:block!important}
+  @page{size:A4 portrait;margin:8mm}
 }
 #danger-tag{display:none}
 </style>
@@ -566,26 +567,55 @@ function PhotoGallery({ equipmentId, eqTag, onClose }) {
 
 // ── PRINT DANGER TAG ─────────────────────────────────────────────────────────
 function printDangerTag(info) {
-  const now = new Date();
-  const time = now.toTimeString().slice(0, 5);
-  const date = now.toLocaleDateString('en-GB');
+  const appliedDate = info.applied_at ? new Date(info.applied_at) : new Date();
+  const fmtDT = d => d.toLocaleString('en-GB',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  const appliedStr = fmtDT(appliedDate);
+  const expStr = info.expected_done_at ? fmtDT(new Date(info.expected_done_at)) : '—';
+  const lockTypeShort = info.lock_type ? info.lock_type.toUpperCase().slice(0,4) : '';
+
+  const row = (label, value) =>
+    `<tr><td style="padding:2px 6px;font-weight:700;white-space:nowrap;width:36%;border-bottom:1px solid #ddd">${label}</td>` +
+    `<td style="padding:2px 6px;border-bottom:1px solid #ddd">${value||'—'}</td></tr>`;
+
+  const tag = (num, label, color) =>
+    `<div style="border:2.5px solid #000;background:#fff;color:#000;font-family:'Courier New',monospace;font-size:9pt;page-break-inside:avoid;max-width:170mm;margin:0 auto">` +
+      `<div style="background:#CC0000;color:#fff;text-align:center;padding:7px 4px;font-size:20pt;font-weight:900;letter-spacing:.1em;line-height:1.1">⚠ DANGER ⚠</div>` +
+      `<div style="background:#000;color:#fff;text-align:center;padding:4px;font-size:7.5pt;font-weight:700;letter-spacing:.08em">DO NOT OPERATE — DO NOT REMOVE THIS TAG</div>` +
+      `<div style="background:${color};color:#fff;text-align:center;padding:3px 4px;font-size:8pt;font-weight:700;letter-spacing:.03em">COPY ${num} OF 3 — ${label}</div>` +
+      `<table style="width:100%;border-collapse:collapse;font-size:8.5pt">` +
+        row('Equipment No:', info.eq_tag) +
+        row('Description:', info.eq_name) +
+        row('Lock No:', info.lock_no + (lockTypeShort ? ` (${lockTypeShort})` : '')) +
+        row('Box Slot:', info.box_slot) +
+        row('Permit No:', info.permit) +
+        row('Reason:', info.reason) +
+        row('Applied:', appliedStr) +
+        row('Exp. Completion:', expStr) +
+      `</table>` +
+      `<div style="border-top:2px solid #000;padding:4px 6px">` +
+        `<table style="width:100%;border-collapse:collapse;font-size:8.5pt">` +
+          row('Name:', info.full_name) +
+          row('I.D. No:', info.id_no) +
+          row('Company:', info.company) +
+          `<tr><td style="padding:2px 6px;font-weight:700">Signature:</td><td style="border-bottom:1.5px solid #000;padding:12px 6px 2px">&nbsp;</td></tr>` +
+        `</table>` +
+      `</div>` +
+    `</div>`;
+
+  const cutLine =
+    `<div style="text-align:center;color:#888;font-size:7.5pt;padding:3px 0;` +
+    `border-top:1.5px dashed #bbb;border-bottom:1.5px dashed #bbb;margin:5mm 0;letter-spacing:.04em">` +
+    `✂ ───────────────────── cut here ───────────────────── ✂</div>`;
+
   const el = document.getElementById('danger-tag');
-  el.innerHTML = `<div style="width:72mm;font-family:'Courier New',monospace;font-size:10pt;border:3px solid #000;padding:3mm;background:#fff;color:#000">
-    <div style="text-align:center;background:#000;color:#fff;font-weight:900;font-size:14pt;letter-spacing:.1em;padding:5px;margin-bottom:5px">&#9608;&#9608; DANGER &#9608;&#9608;</div>
-    <div style="text-align:center;font-weight:900;font-size:9pt;margin-bottom:6px;border-bottom:2px solid #000;padding-bottom:3px">DO NOT REMOVE THIS TAG</div>
-    <table style="width:100%;font-size:9pt;border-collapse:collapse">
-      <tr><td style="font-weight:700;width:38%;padding:2px 0">Remarks:</td><td style="border-bottom:1px solid #aaa">&nbsp;</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Equip. No:</td><td>${info.eq_tag||''}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Lock No:</td><td>${info.lock_no||''}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Time:</td><td>${time}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Date:</td><td>${date}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Work Permit:</td><td>${info.permit||'—'}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">I.D. No:</td><td>${info.id_no||''}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Name:</td><td>${info.full_name||''}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Company:</td><td>${info.company||''}</td></tr>
-      <tr><td style="font-weight:700;padding:2px 0">Signature:</td><td style="border-bottom:1px solid #aaa">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</td></tr>
-    </table>
-  </div>`;
+  el.innerHTML =
+    `<div style="padding:0;background:#fff">` +
+      tag(1,'ATTACH TO ISOLATION POINT','#CC0000') +
+      cutLine +
+      tag(2,'PLACE WITH KEY IN LOCK BOX','#1d4ed8') +
+      cutLine +
+      tag(3,'TECHNICIAN FIELD COPY','#166534') +
+    `</div>`;
   el.style.display = 'block';
   setTimeout(() => { window.print(); el.style.display = 'none'; el.innerHTML = ''; }, 150);
 }
@@ -721,7 +751,7 @@ function ApplyLockModal({ equipment: eq, session, lockType, locks, onClose, onAp
       }
     }
     toast(`Lock ${lock.lock_no} applied to ${eq.tag}${(photo1||photo2) ? ' with photo' : ''}`);
-    onApplied({ lock_no: lock.lock_no, eq_tag: eq.tag, id_no: session.id_no, full_name: session.full_name, company: session.company, permit });
+    onApplied({ lock_no: lock.lock_no, eq_tag: eq.tag, eq_name: eq.name, id_no: session.id_no, full_name: session.full_name, company: session.company, permit, reason: finalReason, lock_type: lockType, box_slot: boxSlot, applied_at: now, expected_done_at: expectedDoneAt });
     setLoading(false);
   };
 
@@ -895,7 +925,7 @@ function EquipmentCard({ eq, locks, session, onAction }) {
             <button className="btn btn-sm btn-danger" onClick={() => onAction('remove', eq, myLocks[0])}>
               Remove My Lock ({myLocks[0].lock_no})
             </button>
-            <button className="tag-print-btn btn-sm" onClick={() => printDangerTag({ eq_tag: eq.tag, lock_no: myLocks[0].lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: myLocks[0].permit })}>
+            <button className="tag-print-btn btn-sm" onClick={() => printDangerTag({ eq_tag: eq.tag, eq_name: eq.name, lock_no: myLocks[0].lock_no, lock_type: myLocks[0].lock_type, box_slot: myLocks[0].box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: myLocks[0].permit, reason: myLocks[0].reason, applied_at: myLocks[0].applied_at, expected_done_at: myLocks[0].expected_done_at })}>
               🖨 Print Tag
             </button>
           </>}
@@ -993,7 +1023,7 @@ function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit })}>
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
                     🖨 Tag
                   </button>
                   <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
@@ -1089,7 +1119,7 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit })}>
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
                     🖨 Tag
                   </button>
                   <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
@@ -1957,7 +1987,7 @@ function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
                   <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit })}>
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
                     🖨 Tag
                   </button>
                   <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
@@ -2014,7 +2044,7 @@ function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
                   <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, lock_no: l.lock_no, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit })}>
+                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
                     🖨 Tag
                   </button>
                   <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
