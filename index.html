@@ -1495,11 +1495,14 @@ function SuperMCCRooms({ equipment, locks }) {
 }
 
 // ── SUPERVISOR: REPORTS TAB ───────────────────────────────────────────────────
-function SuperReports({ session }) {
+function SuperReports({ session, equipment, locks }) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState({ dateFrom: '', dateTo: '', person: '', tag: '', status: 'all', lockType: 'all' });
-  const [reportType, setReportType] = useState('internal');
+  const [reportType, setReportType] = useState('history');
+  const [eqHistTag, setEqHistTag] = useState('');
+  const [eqHistLogs, setEqHistLogs] = useState([]);
+  const [eqHistLoading, setEqHistLoading] = useState(false);
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -1517,126 +1520,368 @@ function SuperReports({ session }) {
   }, [filters]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
-
   const fSet = (k, v) => setFilters(f => ({ ...f, [k]: v }));
+
+  const fetchEqHistory = async () => {
+    if (!eqHistTag.trim()) return;
+    setEqHistLoading(true);
+    const { data } = await db.from('audit_log').select('*')
+      .ilike('eq_tag', `%${eqHistTag.trim()}%`)
+      .order('action_at', { ascending: false }).limit(300);
+    setEqHistLogs(data || []);
+    setEqHistLoading(false);
+  };
 
   const exportCSV = () => {
     const headers = ['Action','Lock No','Lock Type','Eq Tag','Eq Name','By','ID No','Reason','Permit','Box Slot','Date/Time'];
     const rows = logs.map(l => [l.action, l.lock_no, l.lock_type, l.eq_tag, l.eq_name, l.by_name, l.by_id_no, l.reason, l.permit||'', l.box_slot||'', l.action_at ? new Date(l.action_at).toLocaleString() : '']);
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c||'').replace(/"/g,'""')}"`).join(',')).join('\n');
-    const a = document.createElement('a');
-    a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
-    a.download = 'loto_report.csv'; a.click();
+    const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+    a.download = 'loto_history.csv'; a.click();
   };
 
-  const generatePDF = () => {
+  const now = new Date();
+  const activeLocks  = (locks || []).filter(l => l.status === 'applied');
+  const activeOps    = activeLocks.filter(l => l.lock_type === 'operations');
+  const activeMech   = activeLocks.filter(l => l.lock_type === 'mechanical');
+  const activeElec   = activeLocks.filter(l => l.lock_type === 'electrical');
+  const overdueList  = activeLocks
+    .filter(l => l.expected_done_at && new Date(l.expected_done_at) < now)
+    .map(l => { const ms = now - new Date(l.expected_done_at); return { ...l, eq: (equipment||[]).find(e=>e.id===l.equipment_id), hoursOvr: Math.floor(ms/3600000), minsOvr: Math.floor((ms%3600000)/60000) }; })
+    .sort((a,b) => new Date(a.expected_done_at) - new Date(b.expected_done_at));
+
+  const buildEqHistory = () => {
+    const applied = eqHistLogs.filter(l => l.action === 'APPLIED');
+    return applied.map(a => {
+      const removed = eqHistLogs.find(r => r.action === 'REMOVED' && r.lock_no === a.lock_no && new Date(r.action_at) > new Date(a.action_at));
+      const ms = removed ? new Date(removed.action_at) - new Date(a.action_at) : null;
+      return { ...a, removed, duration: ms ? `${Math.floor(ms/3600000)}h ${Math.floor((ms%3600000)/60000)}m` : 'Active' };
+    });
+  };
+
+  const generateHandoverPDF = () => {
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-    const now = new Date();
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold');
-    doc.text('SMART LOTO — Official Lockout/Tagout Report', 148, 15, { align: 'center' });
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal');
-    const rNo = `LR-${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+    const ts = now.toLocaleString();
+    doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+    doc.text('SMART LOTO — SHIFT HANDOVER REPORT', 148, 14, { align: 'center' });
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${ts}`, 14, 22);
+    doc.text(`By: ${session.full_name} (${session.id_no})`, 14, 27);
+    doc.text(`Active Locks — OPS: ${activeOps.length}  MECH: ${activeMech.length}  ELEC: ${activeElec.length}  TOTAL: ${activeLocks.length}`, 14, 32);
+    let y = 40;
+    const drawSection = (title, data, rgb) => {
+      if (!data.length) return;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(9);
+      doc.setTextColor(...rgb); doc.text(`${title} (${data.length})`, 14, y); y += 5;
+      doc.setTextColor(0,0,0); doc.setFontSize(7.5);
+      const cols = [14, 34, 78, 118, 142, 168, 210, 248];
+      const hdrs = ['Lock No','Equipment','Description','Box Slot','Applied By','Applied At','Exp. Done','Reason'];
+      doc.setFont('helvetica','bold'); hdrs.forEach((h,i)=>doc.text(h,cols[i],y)); y+=3;
+      doc.line(14,y,283,y); y+=3; doc.setFont('helvetica','normal');
+      data.forEach(l => {
+        if (y > 186) { doc.addPage(); y = 14; }
+        const eq = (equipment||[]).find(e=>e.id===l.equipment_id);
+        const fmtD = d => new Date(d).toLocaleString('en-GB',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+        [l.lock_no, eq?.tag||'—', (eq?.name||'').slice(0,20), l.box_slot||'—', (l.applied_by||'').slice(0,14),
+         l.applied_at?fmtD(l.applied_at):'—', l.expected_done_at?fmtD(l.expected_done_at):'—', (l.reason||'').slice(0,16)]
+          .forEach((v,i)=>doc.text(String(v),cols[i],y));
+        y+=5;
+      });
+      y+=4; doc.line(14,y,283,y); y+=6;
+    };
+    drawSection('OPERATIONS LOCKS', activeOps, [34,197,94]);
+    drawSection('MECHANICAL LOCKS', activeMech, [59,130,246]);
+    drawSection('ELECTRICAL LOCKS', activeElec, [239,68,68]);
+    if (activeLocks.length===0) doc.text('No active locks at this time.',14,y);
+    if (y<182) {
+      y = Math.max(y,170);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8);
+      doc.text('Outgoing Supervisor: ____________________________  Sign: _________________  Time: __________', 14, y); y+=9;
+      doc.text('Incoming Supervisor: ____________________________  Sign: _________________  Time: __________', 14, y);
+    }
+    doc.save(`handover_${now.toISOString().slice(0,10)}.pdf`);
+  };
+
+  const generateOfficialPDF = () => {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+    const n = new Date();
+    const rNo = `LR-${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+    doc.setFontSize(16); doc.setFont('helvetica','bold');
+    doc.text('SMART LOTO — Official Lockout/Tagout Report', 148, 15, { align:'center' });
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
     doc.text(`Report No: ${rNo}`, 14, 28);
     doc.text(`Generated By: ${session.full_name} (${session.id_no})`, 14, 34);
-    doc.text(`Date Generated: ${now.toLocaleString()}`, 14, 40);
-    if (filters.dateFrom || filters.dateTo) doc.text(`Date Range: ${filters.dateFrom||'—'} to ${filters.dateTo||'—'}`, 14, 46);
-
-    const applied = logs.filter(l => l.action === 'APPLIED');
+    doc.text(`Date Generated: ${n.toLocaleString()}`, 14, 40);
+    if (filters.dateFrom||filters.dateTo) doc.text(`Date Range: ${filters.dateFrom||'—'} to ${filters.dateTo||'—'}`, 14, 46);
+    const applied = logs.filter(l => l.action==='APPLIED');
     let y = 58;
-    const cols = [14, 30, 55, 72, 90, 105, 125, 155, 175, 205, 230, 255];
-    const headers = ['Eq Tag','Eq Name','Lock No','Type','Permit','Applied By','Applied At','Removed By','Removed At','Duration','Status'];
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
-    headers.forEach((h, i) => { if (cols[i]) doc.text(h, cols[i], y); });
-    y += 5; doc.setFont('helvetica', 'normal'); doc.line(14, y, 283, y); y += 4;
-
+    const cols = [14,30,55,72,90,105,125,155,175,205,230,255];
+    const hdrs = ['Eq Tag','Eq Name','Lock No','Type','Permit','Applied By','Applied At','Removed By','Removed At','Duration','Status'];
+    doc.setFont('helvetica','bold'); doc.setFontSize(8);
+    hdrs.forEach((h,i)=>{ if(cols[i]) doc.text(h,cols[i],y); }); y+=5;
+    doc.setFont('helvetica','normal'); doc.line(14,y,283,y); y+=4;
     applied.forEach(a => {
-      if (y > 185) { doc.addPage(); y = 20; }
-      const removed = logs.find(r => r.action === 'REMOVED' && r.lock_no === a.lock_no && r.eq_tag === a.eq_tag && new Date(r.action_at) > new Date(a.action_at));
-      let dur = 'Active';
-      if (removed) { const ms = new Date(removed.action_at) - new Date(a.action_at); dur = `${Math.floor(ms/3600000)}h ${Math.floor((ms%3600000)/60000)}m`; }
-      const row = [
-        (a.eq_tag||'').slice(0,10), (a.eq_name||'').slice(0,14), (a.lock_no||'').slice(0,10),
-        (a.lock_type||'').slice(0,8), (a.permit||'').slice(0,12), (a.by_name||'').slice(0,14),
-        a.action_at ? new Date(a.action_at).toLocaleDateString('en-GB') : '',
-        removed ? (removed.by_name||'').slice(0,14) : '—',
-        removed ? new Date(removed.action_at).toLocaleDateString('en-GB') : '—',
-        dur, removed ? 'Completed' : 'Active'
-      ];
-      row.forEach((c, i) => { if (cols[i]) doc.text(String(c), cols[i], y); });
-      y += 6;
+      if (y>185) { doc.addPage(); y=20; }
+      const rem = logs.find(r=>r.action==='REMOVED'&&r.lock_no===a.lock_no&&r.eq_tag===a.eq_tag&&new Date(r.action_at)>new Date(a.action_at));
+      let dur='Active';
+      if(rem){const ms=new Date(rem.action_at)-new Date(a.action_at);dur=`${Math.floor(ms/3600000)}h ${Math.floor((ms%3600000)/60000)}m`;}
+      [(a.eq_tag||'').slice(0,10),(a.eq_name||'').slice(0,14),(a.lock_no||'').slice(0,10),(a.lock_type||'').slice(0,8),
+       (a.permit||'').slice(0,12),(a.by_name||'').slice(0,14),a.action_at?new Date(a.action_at).toLocaleDateString('en-GB'):'',
+       rem?(rem.by_name||'').slice(0,14):'—',rem?new Date(rem.action_at).toLocaleDateString('en-GB'):'—',dur,rem?'Completed':'Active']
+        .forEach((c,i)=>{ if(cols[i]) doc.text(String(c),cols[i],y); }); y+=6;
     });
-    if (applied.length === 0) doc.text('No records found for selected filters.', 14, y);
-    y += 14; doc.line(14, y, 283, y); y += 8;
+    if(!applied.length) doc.text('No records found for selected filters.',14,y);
+    y+=14; doc.line(14,y,283,y); y+=8;
     doc.text('Supervisor: _______________________________    Date: _______________', 14, y);
     doc.save('smart_loto_official_report.pdf');
   };
 
+  const RTABS = [
+    { id:'history',  label:'📋 History Log' },
+    { id:'handover', label:'🔄 Shift Handover' },
+    { id:'eq_hist',  label:'🏭 Equipment History' },
+    { id:'overdue',  label:`⚠ Overdue (${overdueList.length})` },
+    { id:'pdf',      label:'📄 Official PDF' },
+  ];
+
   return (
     <div className="main">
-      <div className="card">
-        <div className="section-header">
-          <div className="card-title" style={{ margin: 0 }}>Reports</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button className={`btn btn-sm ${reportType === 'internal' ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setReportType('internal')}>Internal Report</button>
-            <button className={`btn btn-sm ${reportType === 'pdf' ? 'btn-accent' : 'btn-ghost'}`} onClick={() => setReportType('pdf')}>Official PDF</button>
-          </div>
-        </div>
-        <div className="filter-row" style={{ marginBottom: 14 }}>
-          {[
-            { label: 'Date From', el: <input type="date" value={filters.dateFrom} onChange={e => fSet('dateFrom', e.target.value)} /> },
-            { label: 'Date To',   el: <input type="date" value={filters.dateTo}   onChange={e => fSet('dateTo',   e.target.value)} /> },
-            { label: 'Person',    el: <input type="text" value={filters.person}   onChange={e => fSet('person',   e.target.value)} placeholder="Name..." /> },
-            { label: 'Eq Tag',    el: <input type="text" value={filters.tag}      onChange={e => fSet('tag',      e.target.value)} placeholder="Tag..." /> },
-            { label: 'Status',    el: <select value={filters.status} onChange={e => fSet('status', e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="completed">Completed</option></select> },
-            { label: 'Lock Type', el: <select value={filters.lockType} onChange={e => fSet('lockType', e.target.value)}><option value="all">All</option><option value="operations">Operations</option><option value="mechanical">Mechanical</option><option value="electrical">Electrical</option></select> },
-          ].map((f, i) => (
-            <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label className="form-label">{f.label}</label>
-              {f.el}
-            </div>
+      <div className="card" style={{ padding:'10px 14px' }}>
+        <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+          {RTABS.map(t => (
+            <button key={t.id} className={`btn btn-sm ${reportType===t.id?'btn-accent':'btn-ghost'}`}
+              onClick={() => setReportType(t.id)}>{t.label}</button>
           ))}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, justifyContent: 'flex-end' }}>
-            <button className="btn btn-accent" onClick={fetchLogs} disabled={loading}>{loading ? 'Loading...' : 'Apply'}</button>
-          </div>
         </div>
-        {reportType === 'internal' && <>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{logs.length} records</span>
-            <button className="btn btn-ghost btn-sm" onClick={exportCSV}>⬇ Export CSV</button>
+      </div>
+
+      {/* ── HISTORY LOG ── */}
+      {reportType === 'history' && (
+        <div className="card">
+          <div className="section-header">
+            <div className="card-title" style={{ margin:0 }}>History Log</div>
+            <button className="btn btn-ghost btn-sm" onClick={exportCSV}>⬇ CSV</button>
           </div>
+          <div className="filter-row" style={{ marginBottom:14 }}>
+            {[
+              { label:'Date From', el:<input type="date" value={filters.dateFrom} onChange={e=>fSet('dateFrom',e.target.value)} /> },
+              { label:'Date To',   el:<input type="date" value={filters.dateTo}   onChange={e=>fSet('dateTo',  e.target.value)} /> },
+              { label:'Person',    el:<input type="text" value={filters.person}   onChange={e=>fSet('person',  e.target.value)} placeholder="Name..." /> },
+              { label:'Eq Tag',    el:<input type="text" value={filters.tag}      onChange={e=>fSet('tag',     e.target.value)} placeholder="Tag..." /> },
+              { label:'Status',    el:<select value={filters.status}   onChange={e=>fSet('status',  e.target.value)}><option value="all">All</option><option value="active">Applied</option><option value="completed">Removed</option></select> },
+              { label:'Lock Type', el:<select value={filters.lockType} onChange={e=>fSet('lockType',e.target.value)}><option value="all">All</option><option value="operations">Operations</option><option value="mechanical">Mechanical</option><option value="electrical">Electrical</option></select> },
+            ].map((f,i) => (
+              <div key={i} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <label className="form-label">{f.label}</label>{f.el}
+              </div>
+            ))}
+            <div style={{ display:'flex', flexDirection:'column', gap:4, justifyContent:'flex-end' }}>
+              <button className="btn btn-accent" onClick={fetchLogs} disabled={loading}>{loading?'Loading...':'Apply'}</button>
+            </div>
+          </div>
+          <div style={{ fontSize:12, color:'var(--muted)', marginBottom:8 }}>{logs.length} records</div>
           <div className="ovr-x">
             <table>
-              <thead><tr><th>Action</th><th>Lock No</th><th>Type</th><th>Equipment</th><th>By</th><th>Reason</th><th>Permit</th><th>Box Slot</th><th>Date/Time</th></tr></thead>
+              <thead><tr><th>Action</th><th>Lock No</th><th>Type</th><th>Equipment</th><th>By</th><th>Reason</th><th>Permit</th><th>Slot</th><th>Date/Time</th></tr></thead>
               <tbody>
                 {logs.map(l => (
                   <tr key={l.id}>
-                    <td><span className={`badge ${l.action === 'APPLIED' ? 'badge-red' : 'badge-green'}`}>{l.action}</span></td>
-                    <td><span style={{ fontFamily: 'monospace', fontWeight: 700, color: lockColor(l.lock_type) }}>{l.lock_no}</span></td>
+                    <td><span className={`badge ${l.action==='APPLIED'?'badge-red':'badge-green'}`}>{l.action}</span></td>
+                    <td><span style={{ fontFamily:'monospace', fontWeight:700, color:lockColor(l.lock_type) }}>{l.lock_no}</span></td>
                     <td><span className={`badge ${lockBadgeClass(l.lock_type)}`}>{l.lock_type}</span></td>
-                    <td>{l.eq_tag}{l.eq_name && <span style={{ color: 'var(--muted)', fontSize: 11 }}> — {l.eq_name}</span>}</td>
-                    <td>{l.by_name}<br /><span style={{ fontSize: 10, color: 'var(--muted)' }}>{l.by_id_no}</span></td>
-                    <td>{l.reason || '—'}</td>
-                    <td>{l.permit || '—'}</td>
-                    <td>{l.box_slot || '—'}</td>
-                    <td style={{ fontSize: 11, whiteSpace: 'nowrap' }}>{l.action_at ? new Date(l.action_at).toLocaleString() : ''}</td>
+                    <td>{l.eq_tag}{l.eq_name&&<span style={{ color:'var(--muted)', fontSize:11 }}> — {l.eq_name}</span>}</td>
+                    <td>{l.by_name}<br/><span style={{ fontSize:10, color:'var(--muted)' }}>{l.by_id_no}</span></td>
+                    <td>{l.reason||'—'}</td>
+                    <td>{l.permit||'—'}</td>
+                    <td>{l.box_slot||'—'}</td>
+                    <td style={{ fontSize:11, whiteSpace:'nowrap' }}>{l.action_at?new Date(l.action_at).toLocaleString():''}</td>
                   </tr>
                 ))}
-                {!loading && logs.length === 0 && <tr><td colSpan={9} className="empty">No records found.</td></tr>}
+                {!loading&&logs.length===0&&<tr><td colSpan={9} className="empty">No records found.</td></tr>}
               </tbody>
             </table>
           </div>
-        </>}
-        {reportType === 'pdf' && (
-          <div style={{ textAlign: 'center', padding: '30px 0' }}>
-            <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 8 }}>Official PDF Report</div>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 20, maxWidth: 480, margin: '0 auto 20px' }}>
-              Generates a formatted landscape PDF using current filter settings. Includes equipment, lock details, applied/removed times, duration, and supervisor signature line.
-            </div>
-            <button className="btn btn-accent" style={{ fontSize: 14, padding: '10px 28px' }} onClick={generatePDF}>⬇ Download PDF Report</button>
+        </div>
+      )}
+
+      {/* ── SHIFT HANDOVER ── */}
+      {reportType === 'handover' && (
+        <div className="card">
+          <div className="section-header">
+            <div className="card-title" style={{ margin:0 }}>Shift Handover Report</div>
+            <button className="btn btn-accent btn-sm" onClick={generateHandoverPDF}>⬇ Download PDF</button>
           </div>
-        )}
-      </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:16 }}>
+            {[
+              { n:activeLocks.length, label:'Total Active', color:'var(--accent)' },
+              { n:activeOps.length,   label:'Operations',   color:'#22c55e' },
+              { n:activeMech.length,  label:'Mechanical',   color:'#3b82f6' },
+              { n:activeElec.length,  label:'Electrical',   color:'#ef4444' },
+            ].map(s => (
+              <div key={s.label} className="stat-card">
+                <div className="stat-num" style={{ color:s.color }}>{s.n}</div>
+                <div className="stat-label">{s.label}</div>
+                <div className="stat-bar" style={{ background:s.color }} />
+              </div>
+            ))}
+          </div>
+          {activeLocks.length===0 && <div className="empty" style={{ color:'#22c55e' }}>✓ No active locks at this time.</div>}
+          {[
+            { type:'operations', data:activeOps,  color:'#22c55e', cls:'badge-green' },
+            { type:'mechanical', data:activeMech, color:'#3b82f6', cls:'badge-blue'  },
+            { type:'electrical', data:activeElec, color:'#ef4444', cls:'badge-red'   },
+          ].map(({ type, data, color, cls }) => data.length>0 && (
+            <div key={type} style={{ marginBottom:16 }}>
+              <div style={{ fontWeight:700, color, marginBottom:6, textTransform:'uppercase', fontSize:12 }}>{type} Locks ({data.length})</div>
+              <div className="ovr-x">
+                <table>
+                  <thead><tr><th>Lock No</th><th>Equipment</th><th>Box Slot</th><th>Applied By</th><th>Applied At</th><th>Exp. Done</th><th>Reason</th></tr></thead>
+                  <tbody>
+                    {data.map(l => {
+                      const eq = (equipment||[]).find(e=>e.id===l.equipment_id);
+                      const ovr = l.expected_done_at && new Date(l.expected_done_at) < now;
+                      return (
+                        <tr key={l.id}>
+                          <td><span className={`badge ${cls}`}>{l.lock_no}</span></td>
+                          <td>{eq?`${eq.tag} — ${eq.name}`:'—'}</td>
+                          <td style={{ fontFamily:'monospace', color:'var(--warn)' }}>{l.box_slot||'—'}</td>
+                          <td>{l.applied_by}</td>
+                          <td style={{ fontSize:11 }}>{l.applied_at?new Date(l.applied_at).toLocaleString():'—'}</td>
+                          <td style={{ fontSize:11, color:ovr?'#ef4444':'inherit' }}>
+                            {l.expected_done_at?new Date(l.expected_done_at).toLocaleString():'—'}{ovr&&' ⚠'}
+                          </td>
+                          <td>{l.reason||'—'}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── EQUIPMENT HISTORY ── */}
+      {reportType === 'eq_hist' && (
+        <div className="card">
+          <div className="card-title">Equipment History Card</div>
+          <div style={{ display:'flex', gap:8, marginBottom:16 }}>
+            <input type="text" value={eqHistTag} onChange={e=>setEqHistTag(e.target.value)}
+              placeholder="Enter equipment tag (e.g. P-101A)..." style={{ flex:1 }}
+              onKeyDown={e=>e.key==='Enter'&&fetchEqHistory()} />
+            <button className="btn btn-accent" onClick={fetchEqHistory} disabled={eqHistLoading}>
+              {eqHistLoading?'Loading...':'Search'}
+            </button>
+          </div>
+          {!eqHistTag && <div className="empty">Enter an equipment tag to view its full lock history.</div>}
+          {eqHistTag && !eqHistLoading && eqHistLogs.length===0 && <div className="empty">No records found for "{eqHistTag}"</div>}
+          {eqHistLogs.length>0 && (() => {
+            const hist = buildEqHistory();
+            const eq = (equipment||[]).find(e=>e.tag.toLowerCase().includes(eqHistTag.toLowerCase().trim()));
+            return (
+              <>
+                {eq && (
+                  <div className="detail-panel" style={{ marginBottom:12 }}>
+                    <div className="detail-row"><span className="detail-label">Tag</span><span className="eq-tag">{eq.tag}</span></div>
+                    <div className="detail-row"><span className="detail-label">Name</span><span>{eq.name}</span></div>
+                    <div className="detail-row"><span className="detail-label">Location</span><span>{eq.plant} → {eq.mcc_room} → {eq.rack} → {eq.row_position}</span></div>
+                    <div className="detail-row"><span className="detail-label">Total Lock Events</span><span style={{ fontWeight:700 }}>{hist.length}</span></div>
+                  </div>
+                )}
+                <div className="ovr-x">
+                  <table>
+                    <thead><tr><th>#</th><th>Lock No</th><th>Type</th><th>Applied By</th><th>Applied At</th><th>Removed By</th><th>Removed At</th><th>Duration</th><th>Reason</th><th>Permit</th></tr></thead>
+                    <tbody>
+                      {hist.map((h,i) => (
+                        <tr key={h.id}>
+                          <td style={{ color:'var(--muted)' }}>{i+1}</td>
+                          <td><span className={`badge ${lockBadgeClass(h.lock_type)}`}>{h.lock_no}</span></td>
+                          <td><span className={`badge ${lockBadgeClass(h.lock_type)}`}>{h.lock_type}</span></td>
+                          <td>{h.by_name}<br/><span style={{ fontSize:10, color:'var(--muted)' }}>{h.by_id_no}</span></td>
+                          <td style={{ fontSize:11 }}>{new Date(h.action_at).toLocaleString()}</td>
+                          <td>{h.removed?<>{h.removed.by_name}<br/><span style={{ fontSize:10, color:'var(--muted)' }}>{h.removed.by_id_no}</span></>:<span className="badge badge-red">Active</span>}</td>
+                          <td style={{ fontSize:11 }}>{h.removed?new Date(h.removed.action_at).toLocaleString():'—'}</td>
+                          <td><span className={`badge ${h.removed?'badge-gray':'badge-amber'}`}>{h.duration}</span></td>
+                          <td>{h.reason||'—'}</td>
+                          <td>{h.permit||'—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── OVERDUE ── */}
+      {reportType === 'overdue' && (
+        <div className="card">
+          <div className="section-header">
+            <div className="card-title" style={{ margin:0 }}>⚠ Overdue Locks</div>
+            <span style={{ fontSize:12, color:'var(--muted)' }}>Auto-refreshes with page</span>
+          </div>
+          {overdueList.length===0 && <div className="empty" style={{ color:'#22c55e' }}>✓ No overdue locks — all locks within expected time.</div>}
+          {overdueList.length>0 && (
+            <div className="ovr-x">
+              <table>
+                <thead><tr><th>Lock No</th><th>Type</th><th>Equipment</th><th>Box Slot</th><th>Applied By</th><th>Expected Done</th><th>Overdue By</th><th>Reason</th></tr></thead>
+                <tbody>
+                  {overdueList.map(l => (
+                    <tr key={l.id}>
+                      <td><span className={`badge ${lockBadgeClass(l.lock_type)}`}>{l.lock_no}</span></td>
+                      <td><span className={`badge ${lockBadgeClass(l.lock_type)}`}>{l.lock_type}</span></td>
+                      <td>{l.eq?`${l.eq.tag} — ${l.eq.name}`:'—'}</td>
+                      <td style={{ fontFamily:'monospace', color:'var(--warn)' }}>{l.box_slot||'—'}</td>
+                      <td>{l.applied_by}</td>
+                      <td style={{ color:'#ef4444', fontSize:11 }}>{new Date(l.expected_done_at).toLocaleString()}</td>
+                      <td><span className="badge badge-red">{l.hoursOvr}h {l.minsOvr}m</span></td>
+                      <td>{l.reason||'—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── OFFICIAL PDF ── */}
+      {reportType === 'pdf' && (
+        <div className="card">
+          <div className="section-header">
+            <div className="card-title" style={{ margin:0 }}>Official PDF Report</div>
+          </div>
+          <div className="filter-row" style={{ marginBottom:14 }}>
+            {[
+              { label:'Date From', el:<input type="date" value={filters.dateFrom} onChange={e=>fSet('dateFrom',e.target.value)} /> },
+              { label:'Date To',   el:<input type="date" value={filters.dateTo}   onChange={e=>fSet('dateTo',  e.target.value)} /> },
+              { label:'Person',    el:<input type="text" value={filters.person}   onChange={e=>fSet('person',  e.target.value)} placeholder="Name..." /> },
+              { label:'Eq Tag',    el:<input type="text" value={filters.tag}      onChange={e=>fSet('tag',     e.target.value)} placeholder="Tag..." /> },
+              { label:'Lock Type', el:<select value={filters.lockType} onChange={e=>fSet('lockType',e.target.value)}><option value="all">All</option><option value="operations">Operations</option><option value="mechanical">Mechanical</option><option value="electrical">Electrical</option></select> },
+            ].map((f,i)=>(
+              <div key={i} style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <label className="form-label">{f.label}</label>{f.el}
+              </div>
+            ))}
+            <div style={{ display:'flex', flexDirection:'column', gap:4, justifyContent:'flex-end' }}>
+              <button className="btn btn-accent" onClick={fetchLogs} disabled={loading}>{loading?'Loading...':'Load Data'}</button>
+            </div>
+          </div>
+          <div style={{ textAlign:'center', padding:'20px 0' }}>
+            <div style={{ fontSize:13, color:'var(--muted)', marginBottom:16 }}>
+              {logs.length} records loaded — generates a landscape PDF with applied/removed pairs, duration, and supervisor signature.
+            </div>
+            <button className="btn btn-accent" style={{ fontSize:14, padding:'10px 28px' }} onClick={generateOfficialPDF} disabled={!logs.length}>
+              ⬇ Download PDF Report
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1808,7 +2053,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
       {tab === 'equipment' && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'locks'     && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
-      {tab === 'reports'   && <SuperReports session={session} />}
+      {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
       {tab === 'personnel' && <SuperPersonnel />}
       {tab === 'shifts'    && <ShiftSettingsTab />}
     </>
@@ -1934,7 +2179,7 @@ function DeptSuperintendentApp({ session, equipment, locks }) {
           </div>
         </div>
       )}
-      {tab === 'reports' && <SuperReports session={session} />}
+      {tab === 'reports' && <SuperReports session={session} equipment={equipment} locks={locks} />}
     </>
   );
 }
@@ -2092,7 +2337,7 @@ function ReadOnlyApp({ session, equipment, locks }) {
         {TABS.map(t => <button key={t.id} className={`tab ${tab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
       {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
-      {tab === 'reports'   && <SuperReports session={session} />}
+      {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
       {tab === 'audit'     && <AuditLogReadOnly />}
     </>
   );
