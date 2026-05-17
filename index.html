@@ -882,6 +882,7 @@ function RemoveLockModal({ lock, equipment: eq, session, onClose, onRemoved }) {
 
 // ── EQUIPMENT CARD ────────────────────────────────────────────────────────────
 function EquipmentCard({ eq, locks, session, onAction }) {
+  const perms = usePerms();
   const role = session.role;
   const myLockType = roleLockType(role);
   const opsLocks  = locks.filter(l => l.equipment_id === eq.id && l.lock_type === 'operations'  && l.status === 'applied');
@@ -913,19 +914,21 @@ function EquipmentCard({ eq, locks, session, onAction }) {
       {showPhotos && <PhotoGallery equipmentId={eq.id} eqTag={eq.tag} onClose={() => setShowPhotos(false)} />}
       {myLockType && !eq.decommissioned && (
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {!hasMyLock && (
+          {!hasMyLock && canDo(perms, 'apply_lock') && (
             <button className="btn btn-sm btn-accent" onClick={() => onAction('apply', eq)}>
               Apply {myLockType} Lock
             </button>
           )}
-          {hasMyLock && <>
+          {hasMyLock && canDo(perms, 'remove_lock') && (
             <button className="btn btn-sm btn-danger" onClick={() => onAction('remove', eq, myLocks[0])}>
               Remove My Lock ({myLocks[0].lock_no})
             </button>
+          )}
+          {hasMyLock && canDo(perms, 'print_tag') && (
             <button className="tag-print-btn btn-sm" onClick={() => printDangerTag({ eq_tag: eq.tag, eq_name: eq.name, lock_no: myLocks[0].lock_no, lock_type: myLocks[0].lock_type, box_slot: myLocks[0].box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: myLocks[0].permit, reason: myLocks[0].reason, applied_at: myLocks[0].applied_at, expected_done_at: myLocks[0].expected_done_at })}>
               🖨 Print Tag
             </button>
-          </>}
+          )}
         </div>
       )}
     </div>
@@ -934,6 +937,7 @@ function EquipmentCard({ eq, locks, session, onAction }) {
 
 // ── SEARCH EQUIPMENT TAB ──────────────────────────────────────────────────────
 function SearchEquipmentTab({ session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const [q, setQ] = useState('');
   const [applyModal, setApplyModal] = useState(null);
   const [removeModal, setRemoveModal] = useState(null);
@@ -948,7 +952,7 @@ function SearchEquipmentTab({ session, equipment, locks, onRefresh }) {
       {lastApplied && (
         <div className="alert alert-ok" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <span>Lock <strong>{lastApplied.lock_no}</strong> applied to <strong>{lastApplied.eq_tag}</strong></span>
-          <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>
+          {canDo(perms, 'print_tag') && <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>}
         </div>
       )}
       <div className="card">
@@ -984,6 +988,7 @@ function SearchEquipmentTab({ session, equipment, locks, onRefresh }) {
 
 // ── OPS: MY LOCKS TAB ─────────────────────────────────────────────────────────
 function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const myLocks = locks.filter(l => l.applied_id_no === session.id_no && l.lock_type === 'operations' && l.status === 'applied');
   const [removeModal, setRemoveModal] = useState(null);
 
@@ -1019,11 +1024,15 @@ function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
-                    🖨 Tag
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  {canDo(perms, 'print_tag') && (
+                    <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
+                      onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
+                      🖨 Tag
+                    </button>
+                  )}
+                  {canDo(perms, 'remove_lock') && (
+                    <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1041,6 +1050,7 @@ function OpsMyLocksTab({ session, equipment, locks, onRefresh }) {
 
 // ── MECH/ELEC: SMART LIST TAB ─────────────────────────────────────────────────
 function SmartListTab({ session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const myLockType = roleLockType(session.role);
   const [applyModal, setApplyModal] = useState(null);
   const [removeModal, setRemoveModal] = useState(null);
@@ -1065,7 +1075,7 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
       {lastApplied && (
         <div className="alert alert-ok" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
           <span>Lock <strong>{lastApplied.lock_no}</strong> applied to <strong>{lastApplied.eq_tag}</strong></span>
-          <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>
+          {canDo(perms, 'print_tag') && <button className="tag-print-btn" onClick={() => printDangerTag(lastApplied)}>🖨 Print Danger Tag</button>}
         </div>
       )}
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
@@ -1095,7 +1105,9 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
                       Ops lock: <span style={{ color: '#22c55e' }}>{opsLock.lock_no}</span> by {opsLock.applied_by} — {opsLock.reason}
                     </div>}
                   </div>
-                  <button className="btn btn-sm btn-accent" onClick={() => setApplyModal(eq)}>Apply {myLockType} Lock</button>
+                  {canDo(perms, 'apply_lock') && (
+                    <button className="btn btn-sm btn-accent" onClick={() => setApplyModal(eq)}>Apply {myLockType} Lock</button>
+                  )}
                 </div>
               </div>
             );
@@ -1115,11 +1127,15 @@ function SmartListTab({ session, equipment, locks, onRefresh }) {
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>Reason: {l.reason} | At: {l.applied_at ? new Date(l.applied_at).toLocaleString() : '—'}</div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
-                    🖨 Tag
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  {canDo(perms, 'print_tag') && (
+                    <button className="tag-print-btn" style={{ padding: '5px 10px', fontSize: 12 }}
+                      onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: session.id_no, full_name: session.full_name, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
+                      🖨 Tag
+                    </button>
+                  )}
+                  {canDo(perms, 'remove_lock') && (
+                    <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  )}
                 </div>
               </div>
             );
@@ -2236,6 +2252,61 @@ const ASSIGNABLE = [
   { value:'admin',           label:'Admin' },
 ];
 
+// ── PERMISSION SYSTEM ─────────────────────────────────────────────────────────
+const PermsCtx = React.createContext({ _admin: true });
+const usePerms = () => React.useContext(PermsCtx);
+const canSee = (perms, feat) => {
+  if (!perms || perms._admin) return true;
+  const lvl = perms[feat]; return lvl === 'view' || lvl === 'full';
+};
+const canDo = (perms, feat) => {
+  if (!perms || perms._admin) return true;
+  return perms[feat] === 'full';
+};
+
+const PERM_FEATURES = {
+  tabs: [
+    { id:'dashboard',      label:'Dashboard',         icon:'📊' },
+    { id:'plant_map',      label:'Plant Map',          icon:'🗺' },
+    { id:'mcc_rooms',      label:'MCC Rooms',          icon:'🏭' },
+    { id:'box_hooks',      label:'Box & Hooks',        icon:'📦' },
+    { id:'my_locks',       label:'My Locks',           icon:'🔒' },
+    { id:'team_locks',     label:'Team Locks',         icon:'👥' },
+    { id:'smart_list',     label:'Smart List',         icon:'📋' },
+    { id:'search_eq',      label:'Search Equipment',   icon:'🔍' },
+    { id:'reports',        label:'Reports',            icon:'📄' },
+    { id:'findings',       label:'Findings',           icon:'🚩' },
+    { id:'compliance',     label:'Compliance',         icon:'✅' },
+    { id:'audit_log',      label:'Audit Log',          icon:'📜' },
+    { id:'personnel',      label:'Personnel',          icon:'👤' },
+    { id:'equipment_mgmt', label:'Equipment Mgmt',     icon:'⚙' },
+    { id:'shift_settings', label:'Shift Settings',     icon:'⏰' },
+  ],
+  actions: [
+    { id:'apply_lock',       label:'Apply Lock',                icon:'🔐' },
+    { id:'remove_lock',      label:'Remove Lock',               icon:'🔓' },
+    { id:'print_tag',        label:'Print Danger Tag',          icon:'🖨' },
+    { id:'upload_photo',     label:'Upload Photo',              icon:'📷' },
+    { id:'create_finding',   label:'Create Finding',            icon:'✏' },
+    { id:'resolve_finding',  label:'Resolve / Close Finding',   icon:'✔' },
+    { id:'export_reports',   label:'Export PDF Reports',        icon:'📥' },
+  ],
+};
+
+const PERM_ROLES = [
+  { value:'hse',                label:'HSE' },
+  { value:'superintendent',     label:'Superintendent' },
+  { value:'auditor',            label:'Auditor' },
+  { value:'ops_supervisor',     label:'Ops Supervisor' },
+  { value:'operations',         label:'Operations' },
+  { value:'mech_superintendent',label:'Mech Superintendent' },
+  { value:'mech_supervisor',    label:'Mech Supervisor' },
+  { value:'mechanical',         label:'Mechanical' },
+  { value:'elec_superintendent',label:'Elec Superintendent' },
+  { value:'elec_supervisor',    label:'Elec Supervisor' },
+  { value:'electrical',         label:'Electrical' },
+];
+
 // ── COMPLIANCE DASHBOARD ──────────────────────────────────────────────────────
 function ComplianceDashboard({ equipment, locks, findings }) {
   const now = new Date();
@@ -2343,8 +2414,9 @@ function ComplianceDashboard({ equipment, locks, findings }) {
 
 // ── FINDING MODAL ─────────────────────────────────────────────────────────────
 function FindingModal({ mode, finding, session, equipment, onClose, onSaved }) {
-  const isAuditor = session.role === 'auditor';
-  const isSup     = ['admin','ops_supervisor','mech_supervisor','elec_supervisor'].includes(session.role);
+  const perms     = usePerms();
+  const isAuditor = session.role === 'auditor' || canDo(perms, 'create_finding');
+  const isSup     = ['admin','ops_supervisor','mech_supervisor','elec_supervisor'].includes(session.role) || canDo(perms, 'resolve_finding');
   const [form, setForm] = useState({
     finding_type: finding?.finding_type || 'missing_lock',
     severity:     finding?.severity     || 'minor',
@@ -2510,6 +2582,7 @@ function FindingModal({ mode, finding, session, equipment, onClose, onSaved }) {
 
 // ── FINDINGS BOARD ────────────────────────────────────────────────────────────
 function FindingsBoard({ session, findings, equipment, onRefresh, showOnly }) {
+  const perms = usePerms();
   const [statusFilter, setStatusFilter] = useState('all');
   const [sevFilter, setSevFilter] = useState('all');
   const [modal, setModal] = useState(null);
@@ -2529,7 +2602,7 @@ function FindingsBoard({ session, findings, equipment, onRefresh, showOnly }) {
           <div className="card-title" style={{margin:0}}>
             {showOnly ? `Findings Assigned to You (${displayed.length})` : `All Findings (${displayed.length})`}
           </div>
-          {session.role==='auditor' && (
+          {canDo(perms, 'create_finding') && (
             <button className="btn btn-danger btn-sm" onClick={()=>setModal({mode:'create'})}>+ New Finding</button>
           )}
         </div>
@@ -2645,76 +2718,98 @@ function SupervisorFindingsTab({ session, equipment }) {
 function SupervisorApp({ session, equipment, locks, onRefresh }) {
   const [tab, setTab] = useState('dashboard');
   const TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'plantmap',  label: '🗺 Plant Map' },
-    { id: 'equipment', label: 'Equipment' },
-    { id: 'locks',     label: 'Locks' },
-    { id: 'mcc',       label: 'MCC Rooms' },
-    { id: 'findings',  label: '🚩 Findings' },
-    { id: 'reports',   label: '📋 Reports' },
-    { id: 'personnel', label: 'Personnel' },
-    { id: 'shifts',    label: '⏰ Shifts' },
+    { id: 'dashboard',   label: '📊 Dashboard' },
+    { id: 'plantmap',    label: '🗺 Plant Map' },
+    { id: 'equipment',   label: 'Equipment' },
+    { id: 'locks',       label: 'Locks' },
+    { id: 'mcc',         label: 'MCC Rooms' },
+    { id: 'findings',    label: '🚩 Findings' },
+    { id: 'reports',     label: '📋 Reports' },
+    { id: 'personnel',   label: 'Personnel' },
+    { id: 'shifts',      label: '⏰ Shifts' },
+    { id: 'permissions', label: '🔑 Permissions' },
   ];
   return (
     <>
       <div className="tabs">
         {TABS.map(t => <button key={t.id} className={`tab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
-      {tab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
-      {tab === 'equipment' && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
-      {tab === 'locks'     && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
-      {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
-      {tab === 'findings'  && <SupervisorFindingsTab session={session} equipment={equipment} />}
-      {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
-      {tab === 'personnel' && <SuperPersonnel />}
-      {tab === 'shifts'    && <ShiftSettingsTab />}
+      {tab === 'dashboard'   && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {tab === 'plantmap'    && <PlantMapTab equipment={equipment} locks={locks} />}
+      {tab === 'equipment'   && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
+      {tab === 'locks'       && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
+      {tab === 'mcc'         && <SuperMCCRooms equipment={equipment} locks={locks} />}
+      {tab === 'findings'    && <SupervisorFindingsTab session={session} equipment={equipment} />}
+      {tab === 'reports'     && <SuperReports session={session} equipment={equipment} locks={locks} />}
+      {tab === 'personnel'   && <SuperPersonnel />}
+      {tab === 'shifts'      && <ShiftSettingsTab />}
+      {tab === 'permissions' && <PermissionsTab />}
     </>
   );
 }
 
 // ── OPERATIONS APP ────────────────────────────────────────────────────────────
 function OperationsApp({ session, equipment, locks, onRefresh }) {
-  const [tab, setTab] = useState('mylocks');
+  const perms = usePerms();
+  const allTabs = [
+    { id:'mylocks', label:'My Locks',         feat:'my_locks'  },
+    { id:'search',  label:'Search Equipment', feat:'search_eq' },
+  ];
+  const tabs = allTabs.filter(t => canSee(perms, t.feat));
+  const [tab, setTab] = useState(tabs[0]?.id || 'mylocks');
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id;
   return (
     <>
       <div className="tabs">
-        <button className={`tab ${tab === 'mylocks' ? 'on' : ''}`} onClick={() => setTab('mylocks')}>My Locks</button>
-        <button className={`tab ${tab === 'search'  ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
+        {tabs.map(t => <button key={t.id} className={`tab ${activeTab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'mylocks' && <OpsMyLocksTab   session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'search'  && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'mylocks' && <OpsMyLocksTab      session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'search'  && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
     </>
   );
 }
 
 // ── MECHANICAL / ELECTRICAL APP ───────────────────────────────────────────────
 function MechElecApp({ session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const isSup = session.role === 'mech_supervisor' || session.role === 'elec_supervisor';
   const myLockType = roleLockType(session.role);
-  const [tab, setTab] = useState(isSup ? 'all' : 'smart');
+  const allTabs = [
+    { id:'all',      label:'Team Locks',       feat:'team_locks', supOnly: true },
+    { id:'smart',    label:'Smart List',       feat:'smart_list'               },
+    { id:'search',   label:'Search Equipment', feat:'search_eq'                },
+    { id:'findings', label:'🚩 Findings',      feat:'findings',   supOnly: true },
+  ];
+  const tabs = allTabs.filter(t => (!t.supOnly || isSup) && canSee(perms, t.feat));
+  const [tab, setTab] = useState(tabs[0]?.id || 'smart');
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id;
   return (
     <>
       <div className="tabs">
-        {isSup && <button className={`tab ${tab==='all'      ?'on':''}`} onClick={() => setTab('all')}>Team Locks</button>}
-        <button className={`tab ${tab === 'smart'  ? 'on' : ''}`} onClick={() => setTab('smart')}>Smart List</button>
-        <button className={`tab ${tab === 'search' ? 'on' : ''}`} onClick={() => setTab('search')}>Search Equipment</button>
-        {isSup && <button className={`tab ${tab==='findings' ?'on':''}`} onClick={() => setTab('findings')}>🚩 Findings</button>}
+        {tabs.map(t => <button key={t.id} className={`tab ${activeTab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'all'      && <AllTypedLocksTab   lockType={myLockType} session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'smart'    && <SmartListTab        session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'search'   && <SearchEquipmentTab  session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
+      {activeTab === 'all'      && <AllTypedLocksTab    lockType={myLockType} session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'smart'    && <SmartListTab         session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'search'   && <SearchEquipmentTab   session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
     </>
   );
 }
 
 // ── DEPT SUPERINTENDENT APP (MECH / ELEC — VIEW ONLY) ────────────────────────
 function DeptSuperintendentApp({ session, equipment, locks }) {
+  const perms  = usePerms();
   const lockType  = roleLockType(session.role);
   const label     = lockType === 'mechanical' ? 'Mechanical' : 'Electrical';
   const boxSize   = '5×5';
-  const [tab, setTab] = useState('box');
+  const allTabs = [
+    { id:'box',     label:'📦 Box & Hooks',  feat:'box_hooks'  },
+    { id:'locks',   label:'🔒 Active Locks', feat:'team_locks' },
+    { id:'reports', label:'📋 Reports',      feat:'reports'    },
+  ];
+  const tabs = allTabs.filter(t => canSee(perms, t.feat));
+  const [tab, setTab] = useState(tabs[0]?.id || 'box');
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id;
   const myLocks   = locks.filter(l => l.lock_type === lockType);
   const applied   = myLocks.filter(l => l.status === 'applied');
   const available = myLocks.filter(l => l.status === 'available');
@@ -2726,11 +2821,9 @@ function DeptSuperintendentApp({ session, equipment, locks }) {
   return (
     <>
       <div className="tabs">
-        <button className={`tab ${tab==='box'    ?'on':''}`} onClick={() => setTab('box')}>📦 Box & Hooks</button>
-        <button className={`tab ${tab==='locks'  ?'on':''}`} onClick={() => setTab('locks')}>🔒 Active Locks</button>
-        <button className={`tab ${tab==='reports'?'on':''}`} onClick={() => setTab('reports')}>📋 Reports</button>
+        {tabs.map(t => <button key={t.id} className={`tab ${activeTab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'box' && (
+      {activeTab === 'box' && (
         <div className="main">
           {violations.length > 0 && (
             <div className="seq-alert">
@@ -2764,7 +2857,7 @@ function DeptSuperintendentApp({ session, equipment, locks }) {
           </div>
         </div>
       )}
-      {tab === 'locks' && (
+      {activeTab === 'locks' && (
         <div className="main">
           <div className="card">
             <div className="card-title">Applied {label} Locks ({applied.length})</div>
@@ -2794,13 +2887,14 @@ function DeptSuperintendentApp({ session, equipment, locks }) {
           </div>
         </div>
       )}
-      {tab === 'reports' && <SuperReports session={session} equipment={equipment} locks={locks} />}
+      {activeTab === 'reports' && <SuperReports session={session} equipment={equipment} locks={locks} />}
     </>
   );
 }
 
 // ── OPS SUPERVISOR: ALL OPS LOCKS TAB ────────────────────────────────────────
 function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const allOps = locks.filter(l => l.lock_type === 'operations' && l.status === 'applied');
   const [removeModal, setRemoveModal] = useState(null);
   const [shiftOnly, setShiftOnly] = useState(false);
@@ -2843,11 +2937,15 @@ function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
-                  <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
-                    🖨 Tag
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  {canDo(perms, 'print_tag') && (
+                    <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
+                      onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
+                      🖨 Tag
+                    </button>
+                  )}
+                  {canDo(perms, 'remove_lock') && (
+                    <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2865,6 +2963,7 @@ function AllOpsLocksTab({ session, equipment, locks, onRefresh }) {
 
 // ── MECH/ELEC SUPERVISOR: ALL TEAM LOCKS TAB ─────────────────────────────────
 function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
+  const perms = usePerms();
   const allLocks = locks.filter(l => l.lock_type === lockType && l.status === 'applied');
   const [removeModal, setRemoveModal] = useState(null);
   const bClass = lockType === 'mechanical' ? 'badge-blue' : 'badge-red';
@@ -2900,11 +2999,15 @@ function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
                   </div>
                 </div>
                 <div style={{ display:'flex', gap:6 }}>
-                  <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
-                    onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
-                    🖨 Tag
-                  </button>
-                  <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  {canDo(perms, 'print_tag') && (
+                    <button className="tag-print-btn" style={{ padding:'5px 10px', fontSize:12 }}
+                      onClick={() => printDangerTag({ eq_tag: eq?.tag, eq_name: eq?.name, lock_no: l.lock_no, lock_type: l.lock_type, box_slot: l.box_slot, id_no: l.applied_id_no, full_name: l.applied_by, company: session.company, permit: l.permit, reason: l.reason, applied_at: l.applied_at, expected_done_at: l.expected_done_at })}>
+                      🖨 Tag
+                    </button>
+                  )}
+                  {canDo(perms, 'remove_lock') && (
+                    <button className="btn btn-sm btn-danger" onClick={() => setRemoveModal({ lock: l, eq })}>Remove</button>
+                  )}
                 </div>
               </div>
             </div>
@@ -2922,39 +3025,48 @@ function AllTypedLocksTab({ lockType, session, equipment, locks, onRefresh }) {
 
 // ── OPS SUPERVISOR APP ────────────────────────────────────────────────────────
 function OpsSupervisorApp({ session, equipment, locks, onRefresh }) {
-  const [tab, setTab] = useState('all');
+  const perms = usePerms();
+  const allTabs = [
+    { id:'all',      label:'Team Locks',        feat:'team_locks' },
+    { id:'my',       label:'My Locks',          feat:'my_locks'   },
+    { id:'search',   label:'Search Equipment',  feat:'search_eq'  },
+    { id:'findings', label:'🚩 Findings',       feat:'findings'   },
+  ];
+  const tabs = allTabs.filter(t => canSee(perms, t.feat));
+  const [tab, setTab] = useState(tabs[0]?.id || 'my');
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id;
   return (
     <>
       <div className="tabs">
-        <button className={`tab ${tab==='all'      ?'on':''}`} onClick={() => setTab('all')}>All Ops Locks</button>
-        <button className={`tab ${tab==='my'       ?'on':''}`} onClick={() => setTab('my')}>My Locks</button>
-        <button className={`tab ${tab==='search'   ?'on':''}`} onClick={() => setTab('search')}>Search Equipment</button>
-        <button className={`tab ${tab==='findings' ?'on':''}`} onClick={() => setTab('findings')}>🚩 Findings</button>
+        {tabs.map(t => <button key={t.id} className={`tab ${activeTab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'all'      && <AllOpsLocksTab    session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'my'       && <OpsMyLocksTab     session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'search'   && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
-      {tab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
+      {activeTab === 'all'      && <AllOpsLocksTab     session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'my'       && <OpsMyLocksTab      session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'search'   && <SearchEquipmentTab session={session} equipment={equipment} locks={locks} onRefresh={onRefresh} />}
+      {activeTab === 'findings' && <SupervisorFindingsTab session={session} equipment={equipment} />}
     </>
   );
 }
 
 // ── READ-ONLY APP (HSE / SUPERINTENDENT) ─────────────────────────────────────
 function ReadOnlyApp({ session, equipment, locks }) {
-  const [tab, setTab] = useState('dashboard');
-  const TABS = [
-    { id: 'dashboard', label: '📊 Dashboard' },
-    { id: 'plantmap',  label: '🗺 Plant Map' },
-    { id: 'reports',   label: '📋 Reports' },
+  const perms = usePerms();
+  const allTabs = [
+    { id: 'dashboard', label: '📊 Dashboard', feat: 'dashboard' },
+    { id: 'plantmap',  label: '🗺 Plant Map',  feat: 'plant_map' },
+    { id: 'reports',   label: '📋 Reports',    feat: 'reports'   },
   ];
+  const tabs = allTabs.filter(t => canSee(perms, t.feat));
+  const [tab, setTab] = useState(tabs[0]?.id || 'dashboard');
+  const activeTab = tabs.find(t => t.id === tab) ? tab : tabs[0]?.id;
   return (
     <>
       <div className="tabs">
-        {TABS.map(t => <button key={t.id} className={`tab ${tab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
+        {tabs.map(t => <button key={t.id} className={`tab ${activeTab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
-      {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
-      {tab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
-      {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
+      {activeTab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {activeTab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
+      {activeTab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
     </>
   );
 }
@@ -3317,16 +3429,101 @@ function ShiftSettingsTab() {
   );
 }
 
+// ── PERMISSIONS TAB (ADMIN ONLY) ──────────────────────────────────────────────
+function PermissionsTab() {
+  const [selectedRole, setSelectedRole] = useState('hse');
+  const [perms, setPerms] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
+
+  useEffect(() => {
+    setLoading(true); setDirty(false);
+    db.from('role_permissions').select('permissions').eq('role', selectedRole).single()
+      .then(({ data }) => { setPerms(data?.permissions || {}); setLoading(false); });
+  }, [selectedRole]);
+
+  const cycle = feat => {
+    const levels = ['none', 'view', 'full'];
+    const cur = perms[feat] || 'none';
+    const next = levels[(levels.indexOf(cur) + 1) % 3];
+    setPerms(p => ({ ...p, [feat]: next }));
+    setDirty(true);
+  };
+
+  const save = async () => {
+    setSaving(true);
+    const { error } = await db.from('role_permissions').upsert({ role: selectedRole, permissions: perms });
+    if (error) { toast('Save failed: ' + error.message, 'err'); }
+    else { toast('Permissions saved for ' + PERM_ROLES.find(r => r.value === selectedRole)?.label); setDirty(false); }
+    setSaving(false);
+  };
+
+  const lvlStyle = lvl => {
+    if (lvl === 'full') return { background:'rgba(34,197,94,.15)', color:'#22c55e', border:'1px solid rgba(34,197,94,.3)' };
+    if (lvl === 'view') return { background:'rgba(59,130,246,.15)', color:'#3b82f6', border:'1px solid rgba(59,130,246,.3)' };
+    return { background:'rgba(100,116,139,.15)', color:'#94a3b8', border:'1px solid rgba(100,116,139,.3)' };
+  };
+  const lvlIcon = lvl => lvl === 'full' ? '✅ full' : lvl === 'view' ? '👁 view' : '❌ none';
+
+  const FeatureRow = ({ f }) => {
+    const lvl = perms[f.id] || 'none';
+    return (
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'9px 12px', background:'var(--s2)', borderRadius:8, border:'1px solid var(--b)' }}>
+        <span style={{ fontSize:13 }}>{f.icon} {f.label}</span>
+        <button onClick={() => cycle(f.id)}
+          style={{ ...lvlStyle(lvl), padding:'4px 12px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer', border:'1px solid', minWidth:90, textAlign:'center' }}>
+          {lvlIcon(lvl)}
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="main">
+      <div className="card">
+        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:12, marginBottom:20 }}>
+          <div className="card-title" style={{ margin:0 }}>🔑 Role Permissions</div>
+          <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+            <select value={selectedRole} onChange={e => setSelectedRole(e.target.value)} style={{ minWidth:180 }}>
+              {PERM_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+            <button className="btn btn-accent" onClick={save} disabled={saving || loading || !dirty}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </div>
+        {dirty && <div className="alert alert-warn" style={{ marginBottom:14 }}>⚠ Unsaved changes — click Save to apply.</div>}
+        {loading ? <div style={{ display:'flex', justifyContent:'center', padding:30 }}><div className="spin" /></div> : (
+          <>
+            <div style={{ marginBottom:6, fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.05em' }}>Tab Visibility</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:8, marginBottom:20 }}>
+              {PERM_FEATURES.tabs.map(f => <FeatureRow key={f.id} f={f} />)}
+            </div>
+            <div style={{ marginBottom:6, fontSize:11, fontWeight:700, color:'var(--muted)', textTransform:'uppercase', letterSpacing:'.05em' }}>Actions</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:8 }}>
+              {PERM_FEATURES.actions.map(f => <FeatureRow key={f.id} f={f} />)}
+            </div>
+            <div style={{ marginTop:14, fontSize:11, color:'var(--muted)' }}>
+              ❌ none = feature hidden · 👁 view = read-only / visible · ✅ full = full access + actions
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── ROOT APP ──────────────────────────────────────────────────────────────────
 function App() {
-  const [session, setSession]       = useState(null);
-  const [pendingUser, setPendingUser] = useState(null);
-  const [equipment, setEquipment]   = useState([]);
-  const [locks, setLocks]           = useState([]);
+  const [session, setSession]         = useState(null);
+  const [pendingUser, setPendingUser]  = useState(null);
+  const [equipment, setEquipment]     = useState([]);
+  const [locks, setLocks]             = useState([]);
   const [shiftConfig, setShiftConfig] = useState([]);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading]         = useState(true);
+  const [perms, setPerms]             = useState(null); // null = not yet loaded
   const timerRef = useRef(null);
-  const alertTimerRef = useRef(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('loto_session');
@@ -3348,6 +3545,13 @@ function App() {
     fetchData();
     db.from('shift_config').select('*').then(({ data }) => setShiftConfig(data || []));
     timerRef.current = setInterval(fetchData, 30000);
+    // Load permissions — admin gets full access sentinel, others load from DB
+    if (session.role === 'admin') {
+      setPerms({ _admin: true });
+    } else {
+      db.from('role_permissions').select('permissions').eq('role', session.role).single()
+        .then(({ data }) => setPerms(data?.permissions || {}));
+    }
     return () => clearInterval(timerRef.current);
   }, [session, fetchData]);
 
@@ -3360,15 +3564,18 @@ function App() {
 
   const handleLogout = () => {
     localStorage.removeItem('loto_session');
-    setSession(null); setEquipment([]); setLocks([]);
+    setSession(null); setEquipment([]); setLocks([]); setPerms(null);
   };
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100vh' }}><div className="spin" /></div>;
   if (pendingUser) return <><SetPasswordScreen user={pendingUser} onDone={handleSetPwDone} /><Toasts /></>;
   if (!session)    return <><LoginScreen onLogin={handleLogin} /><Toasts /></>;
 
+  // Show spinner while permissions are being loaded for non-admin roles
+  const permsReady = perms !== null;
+
   return (
-    <>
+    <PermsCtx.Provider value={perms || {}}>
       <nav>
         <div className="brand">
           <div className="brand-icon">L</div>
@@ -3391,19 +3598,20 @@ function App() {
         </div>
       </nav>
       <AlertBanner session={session} locks={locks} equipment={equipment} shiftConfig={shiftConfig} />
-      {session.role === 'admin'               && <SupervisorApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {session.role === 'auditor'             && <AuditorApp           session={session} equipment={equipment} locks={locks} />}
-      {isViewOnly(session.role)                && <ReadOnlyApp          session={session} equipment={equipment} locks={locks} />}
-      {isDeptSuperintendent(session.role)      && <DeptSuperintendentApp session={session} equipment={equipment} locks={locks} />}
-      {session.role === 'ops_supervisor'       && <OpsSupervisorApp     session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {session.role === 'operations'           && <OperationsApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {(session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {(session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
-      {!['admin','hse','superintendent','auditor','ops_supervisor','operations','mech_superintendent','mech_supervisor','mechanical','elec_superintendent','elec_supervisor','electrical'].includes(session.role) && (
+      {!permsReady && <div style={{ display:'flex', justifyContent:'center', padding:40 }}><div className="spin" /></div>}
+      {permsReady && session.role === 'admin'               && <SupervisorApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {permsReady && session.role === 'auditor'             && <AuditorApp           session={session} equipment={equipment} locks={locks} />}
+      {permsReady && isViewOnly(session.role)               && <ReadOnlyApp          session={session} equipment={equipment} locks={locks} />}
+      {permsReady && isDeptSuperintendent(session.role)     && <DeptSuperintendentApp session={session} equipment={equipment} locks={locks} />}
+      {permsReady && session.role === 'ops_supervisor'      && <OpsSupervisorApp     session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {permsReady && session.role === 'operations'          && <OperationsApp        session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {permsReady && (session.role === 'mech_supervisor' || session.role === 'mechanical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {permsReady && (session.role === 'elec_supervisor' || session.role === 'electrical') && <MechElecApp session={session} equipment={equipment} locks={locks} onRefresh={fetchData} />}
+      {permsReady && !['admin','hse','superintendent','auditor','ops_supervisor','operations','mech_superintendent','mech_supervisor','mechanical','elec_superintendent','elec_supervisor','electrical'].includes(session.role) && (
         <div className="main"><div className="alert alert-danger">Unknown role "{session.role}". Please sign out and log in again.</div></div>
       )}
       <Toasts />
-    </>
+    </PermsCtx.Provider>
   );
 }
 
