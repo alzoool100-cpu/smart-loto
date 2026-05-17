@@ -2032,15 +2032,190 @@ function SuperPersonnel() {
   );
 }
 
+// ── PLANT MAP TAB ─────────────────────────────────────────────────────────────
+function PlantMapTab({ equipment, locks }) {
+  const [view, setView] = useState({ level: 1, plant: null, room: null });
+  const now = new Date();
+
+  const STATUS = {
+    clean:   { color:'#22c55e', bg:'rgba(34,197,94,.1)',   border:'rgba(34,197,94,.35)',   icon:'✓', label:'Clean'   },
+    partial: { color:'#f59e0b', bg:'rgba(245,158,11,.1)',  border:'rgba(245,158,11,.35)',  icon:'⚡', label:'OPS Only' },
+    locked:  { color:'#ef4444', bg:'rgba(239,68,68,.1)',   border:'rgba(239,68,68,.35)',   icon:'🔒', label:'Locked'  },
+    overdue: { color:'#a855f7', bg:'rgba(168,85,247,.1)',  border:'rgba(168,85,247,.35)',  icon:'⏰', label:'Overdue' },
+  };
+
+  const eqStatus = eq => {
+    const al = locks.filter(l => l.equipment_id === eq.id && l.status === 'applied');
+    if (!al.length) return 'clean';
+    if (al.some(l => l.expected_done_at && new Date(l.expected_done_at) < now)) return 'overdue';
+    const hasOps = al.some(l => l.lock_type === 'operations');
+    const hasME  = al.some(l => l.lock_type === 'mechanical' || l.lock_type === 'electrical');
+    if (hasOps && !hasME) return 'partial';
+    return 'locked';
+  };
+
+  const groupStatus = list => {
+    const ss = list.map(eqStatus);
+    if (ss.some(s => s === 'overdue')) return 'overdue';
+    if (ss.some(s => s === 'locked'))  return 'locked';
+    if (ss.some(s => s === 'partial')) return 'partial';
+    return 'clean';
+  };
+
+  const plants  = [...new Set(Object.values(MCC_ROOMS).map(r => r.plant))].sort();
+  const roomsForPlant = view.plant
+    ? Object.entries(MCC_ROOMS).filter(([,r]) => r.plant === view.plant)
+    : [];
+  const racksForRoom = view.room ? (MCC_ROOMS[view.room]?.racks || []) : [];
+
+  const lockBadge = lockType =>
+    lockType === 'operations' ? 'badge-green' : lockType === 'mechanical' ? 'badge-blue' : 'badge-red';
+
+  const Card = ({ onClick, cfg, title, sub, extraBadge }) => (
+    <div onClick={onClick} style={{ border:`2px solid ${cfg.border}`, background:cfg.bg, borderRadius:12,
+      padding:16, cursor:'pointer', transition:'all .2s', userSelect:'none' }}
+      onMouseEnter={e => e.currentTarget.style.transform='translateY(-2px)'}
+      onMouseLeave={e => e.currentTarget.style.transform='none'}>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+        <div style={{ fontSize:16, fontWeight:800 }}>{title}</div>
+        <span style={{ fontSize:20 }}>{cfg.icon}</span>
+      </div>
+      <div style={{ fontSize:11, color:'var(--muted)', marginBottom:10 }}>{sub}</div>
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        <span className="badge" style={{ background:cfg.bg, color:cfg.color, border:`1px solid ${cfg.border}` }}>
+          {cfg.icon} {cfg.label}
+        </span>
+        {extraBadge}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="main">
+      {/* Breadcrumb */}
+      <div className="card" style={{ padding:'10px 14px' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:13 }}>
+          <button className="btn btn-ghost btn-sm"
+            onClick={() => setView({ level:1, plant:null, room:null })}>🏭 All Plants</button>
+          {view.plant && <>
+            <span style={{ color:'var(--muted)' }}>›</span>
+            <button className="btn btn-ghost btn-sm"
+              onClick={() => setView(v => ({ ...v, level:2, room:null }))}>{view.plant}</button>
+          </>}
+          {view.room && <>
+            <span style={{ color:'var(--muted)' }}>›</span>
+            <span style={{ color:'var(--accent)', fontWeight:700, padding:'4px 8px' }}>{view.room}</span>
+          </>}
+        </div>
+      </div>
+
+      {/* ── Level 1: Plants ── */}
+      {view.level === 1 && (
+        <div className="card">
+          <div className="card-title">Plant Overview</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            {plants.map(plant => {
+              const pEq  = equipment.filter(e => e.plant === plant);
+              const cfg  = STATUS[groupStatus(pEq)];
+              const actv = locks.filter(l => pEq.some(e => e.id===l.equipment_id) && l.status==='applied');
+              return (
+                <Card key={plant}
+                  onClick={() => setView({ level:2, plant, room:null })}
+                  cfg={cfg} title={plant}
+                  sub={`${pEq.length} equipment · ${Object.entries(MCC_ROOMS).filter(([,r])=>r.plant===plant).length} MCC rooms`}
+                  extraBadge={actv.length>0 && <span className="badge badge-red">{actv.length} active locks</span>}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Level 2: MCC Rooms ── */}
+      {view.level === 2 && (
+        <div className="card">
+          <div className="card-title">{view.plant} — MCC Rooms</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            {roomsForPlant.map(([roomId, roomData]) => {
+              const rEq  = equipment.filter(e => e.mcc_room === roomId);
+              const cfg  = STATUS[groupStatus(rEq)];
+              const actv = locks.filter(l => rEq.some(e=>e.id===l.equipment_id) && l.status==='applied');
+              return (
+                <Card key={roomId}
+                  onClick={() => setView({ level:3, plant:view.plant, room:roomId })}
+                  cfg={cfg} title={roomId}
+                  sub={`${roomData.racks.length} racks · ${rEq.length} equipment`}
+                  extraBadge={actv.length>0 && <span className="badge badge-red">{actv.length} locks</span>}
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Level 3: Racks + Equipment ── */}
+      {view.level === 3 && (
+        <div className="card">
+          <div className="card-title">{view.room} — Equipment</div>
+          {racksForRoom.length === 0 && <div className="empty">No racks configured for this room.</div>}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(220px,1fr))', gap:12 }}>
+            {racksForRoom.map(rack => {
+              const rEq = equipment.filter(e => e.mcc_room === view.room && e.rack === rack);
+              const cfg = STATUS[groupStatus(rEq)];
+              return (
+                <div key={rack} style={{ border:`1.5px solid ${cfg.border}`, borderRadius:10, overflow:'hidden' }}>
+                  {/* Rack header */}
+                  <div style={{ background:cfg.bg, padding:'8px 12px', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                    <span style={{ fontWeight:700, fontFamily:'monospace', color:cfg.color, fontSize:13 }}>{rack}</span>
+                    <span style={{ fontSize:16 }}>{cfg.icon}</span>
+                  </div>
+                  {/* Equipment rows */}
+                  {rEq.length === 0 && (
+                    <div style={{ padding:'10px 12px', fontSize:11, color:'var(--muted)' }}>No equipment</div>
+                  )}
+                  {rEq.map(eq => {
+                    const al  = locks.filter(l => l.equipment_id === eq.id && l.status === 'applied');
+                    const sc  = STATUS[eqStatus(eq)];
+                    return (
+                      <div key={eq.id} style={{ padding:'9px 12px', borderTop:'1px solid var(--b)',
+                        display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
+                        <div style={{ minWidth:0 }}>
+                          <div style={{ fontFamily:'monospace', fontSize:12, fontWeight:700, color:'var(--accent)', whiteSpace:'nowrap' }}>{eq.tag}</div>
+                          <div style={{ fontSize:10, color:'var(--muted)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:110 }}>{eq.name}</div>
+                        </div>
+                        <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'flex-end', flexShrink:0 }}>
+                          {al.length === 0
+                            ? <span style={{ fontSize:11, color:'#22c55e', fontWeight:600 }}>✓</span>
+                            : al.map(l => (
+                                <span key={l.id} className={`badge ${lockBadge(l.lock_type)}`} style={{ fontSize:9, padding:'1px 5px' }}>
+                                  {l.lock_no}
+                                </span>
+                              ))
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── SUPERVISOR APP ────────────────────────────────────────────────────────────
 function SupervisorApp({ session, equipment, locks, onRefresh }) {
   const [tab, setTab] = useState('dashboard');
   const TABS = [
-    { id: 'dashboard', label: 'Dashboard' },
+    { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'plantmap',  label: '🗺 Plant Map' },
     { id: 'equipment', label: 'Equipment' },
     { id: 'locks',     label: 'Locks' },
     { id: 'mcc',       label: 'MCC Rooms' },
-    { id: 'reports',   label: 'Reports' },
+    { id: 'reports',   label: '📋 Reports' },
     { id: 'personnel', label: 'Personnel' },
     { id: 'shifts',    label: '⏰ Shifts' },
   ];
@@ -2050,6 +2225,7 @@ function SupervisorApp({ session, equipment, locks, onRefresh }) {
         {TABS.map(t => <button key={t.id} className={`tab ${tab === t.id ? 'on' : ''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
       {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {tab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
       {tab === 'equipment' && <SuperEquipment equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'locks'     && <SuperLocks locks={locks} equipment={equipment} onRefresh={onRefresh} />}
       {tab === 'mcc'       && <SuperMCCRooms equipment={equipment} locks={locks} />}
@@ -2328,6 +2504,7 @@ function ReadOnlyApp({ session, equipment, locks }) {
   const isAuditor = session.role === 'auditor';
   const TABS = [
     { id: 'dashboard', label: '📊 Dashboard' },
+    { id: 'plantmap',  label: '🗺 Plant Map' },
     { id: 'reports',   label: '📋 Reports' },
     ...(isAuditor ? [{ id: 'audit', label: '🔍 Audit Log' }] : []),
   ];
@@ -2337,6 +2514,7 @@ function ReadOnlyApp({ session, equipment, locks }) {
         {TABS.map(t => <button key={t.id} className={`tab ${tab===t.id?'on':''}`} onClick={() => setTab(t.id)}>{t.label}</button>)}
       </div>
       {tab === 'dashboard' && <SuperDashboard equipment={equipment} locks={locks} session={session} />}
+      {tab === 'plantmap'  && <PlantMapTab equipment={equipment} locks={locks} />}
       {tab === 'reports'   && <SuperReports session={session} equipment={equipment} locks={locks} />}
       {tab === 'audit'     && <AuditLogReadOnly />}
     </>
